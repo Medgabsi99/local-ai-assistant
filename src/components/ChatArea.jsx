@@ -6,6 +6,7 @@ import {
 } from '../db/database';
 import { ai } from '../workers/worker-bridge';
 import { useRAG } from '../hooks/useRAG';
+import AudioRecorder from './AudioRecorder';
 
 export default function ChatArea({ conversationId }) {
   const [messages, setMessages] = useState([]);
@@ -16,6 +17,11 @@ export default function ChatArea({ conversationId }) {
   const [retrievedContext, setRetrievedContext] = useState(null);
   const messagesEndRef = useRef(null);
   const { searchSimilar } = useRAG();
+  const [transcribedText, setTranscribedText] = useState('');
+
+  const handleTranscription = (text) => {
+    setInput((prev) => prev + (prev ? ' ' : '') + text);
+  };
 
   const loadMessages = useCallback(async () => {
     if (conversationId) {
@@ -244,15 +250,20 @@ export default function ChatArea({ conversationId }) {
       {/* Input Area */}
       <div className="p-4 border-t border-slate-700">
         <div className="flex gap-3 max-w-3xl mx-auto">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              useRAGMode
-                ? 'Ask about your documents... (Enter to send)'
-                : 'Type your message... (Enter to send)'
-            }
+          <div className="flex flex-col gap-2 flex-1">
+            <div className="flex items-center gap-2">
+              <AudioRecorder onTranscriptionComplete={handleTranscription} />
+            </div>
+            <div className="flex gap-3"></div>
+             <textarea
+               value={input}
+               onChange={(e) => setInput(e.target.value)}
+               onKeyDown={handleKeyDown}
+               placeholder={
+                useRAGMode
+                    ? 'Ask about your documents... (Enter to send)'
+                    : 'Type your message... (Enter to send)'
+                }
             rows={1}
             className="flex-1 bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-sm
                      text-slate-100 placeholder-slate-500 resize-none
@@ -278,6 +289,7 @@ export default function ChatArea({ conversationId }) {
           </button>
         </div>
       </div>
+    </div>
     </div>
   );
 }
