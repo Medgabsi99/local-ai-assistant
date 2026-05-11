@@ -4,8 +4,9 @@ class LocalAIDatabase extends Dexie {
   constructor() {
     super('LocalAIDB');
 
-    this.version(1).stores({
-      documents: '++id, title, content, createdAt, updatedAt, fileType',
+    this.version(2).stores({
+      documents: '++id, title, fileType, createdAt, updatedAt',
+      documentChunks: '++id, documentId, chunkIndex',
       conversations: '++id, title, createdAt, updatedAt',
       messages: '++id, conversationId, role, content, timestamp, metadata',
       settings: 'key',
@@ -15,7 +16,7 @@ class LocalAIDatabase extends Dexie {
 
 export const db = new LocalAIDatabase();
 
-// Helper functions
+// Document helpers
 export async function saveDocument({ title, content, fileType = 'text/plain' }) {
   const now = new Date().toISOString();
   return db.documents.add({
@@ -27,10 +28,48 @@ export async function saveDocument({ title, content, fileType = 'text/plain' }) 
   });
 }
 
+export async function updateDocument(id, updates) {
+  return db.documents.update(id, {
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
 export async function getAllDocuments() {
   return db.documents.orderBy('updatedAt').reverse().toArray();
 }
 
+export async function getDocument(id) {
+  return db.documents.get(id);
+}
+
+export async function deleteDocument(id) {
+  await db.documentChunks.where('documentId').equals(id).delete();
+  return db.documents.delete(id);
+}
+
+// Document chunk helpers
+export async function saveDocumentChunks(documentId, chunks) {
+  const items = chunks.map((content, index) => ({
+    documentId,
+    chunkIndex: index,
+    content,
+  }));
+  return db.documentChunks.bulkAdd(items);
+}
+
+export async function getDocumentChunks(documentId) {
+  return db.documentChunks
+    .where('documentId')
+    .equals(documentId)
+    .sortBy('chunkIndex');
+}
+
+export async function getAllChunks() {
+  return db.documentChunks.toArray();
+}
+
+// Conversation helpers
 export async function createConversation(title = 'New Chat') {
   const now = new Date().toISOString();
   return db.conversations.add({
@@ -69,6 +108,7 @@ export async function deleteConversation(id) {
   return db.conversations.delete(id);
 }
 
+// Settings helpers
 export async function getSetting(key) {
   return db.settings.get(key);
 }
@@ -76,3 +116,11 @@ export async function getSetting(key) {
 export async function setSetting(key, value) {
   return db.settings.put({ key, value });
 }
+
+export async function updateConversationTitle(id, title) {
+  return db.conversations.update(id, {
+    title,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
