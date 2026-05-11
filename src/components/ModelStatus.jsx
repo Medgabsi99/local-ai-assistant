@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ai } from '../workers/worker-bridge';
 
 export default function ModelStatus() {
@@ -8,29 +8,34 @@ export default function ModelStatus() {
     whisper: { loaded: false, loading: false, name: 'Whisper Tiny EN' },
   });
   const [progress, setProgress] = useState({});
+  const [downloadInfo, setDownloadInfo] = useState({});
   const [error, setError] = useState(null);
 
-  const checkModels = async () => {
-    for (const model of ['embedding', 'llm', 'whisper']) {
-      try {
-        const result = await ai.checkModel(model);
-        setModelStates((prev) => ({
-          ...prev,
-          [model]: {
-            ...prev[model],
-            loaded: result.loaded,
-            loading: result.loading,
-          },
-        }));
-      } catch {
-        // Model not loaded - that's fine
+  const checkModels = useCallback(async () => {
+    try {
+      const result = await ai.checkAllModels();
+      const states = {};
+      for (const [key, info] of Object.entries(result.statuses)) {
+        states[key] = {
+          ...modelStates[key],
+          loaded: info.loaded,
+          loading: info.loading,
+          name: info.name,
+          size: info.size,
+        };
+        if (info.download) {
+          setDownloadInfo((prev) => ({ ...prev, [key]: info.download }));
+        }
       }
+      setModelStates((prev) => ({ ...prev, ...states }));
+    } catch {
+      // Ignore - models not checked yet
     }
-  };
+  }, []);
 
   useEffect(() => {
     checkModels();
-  }, []);
+  }, [checkModels]);
 
   const loadModel = async (modelName) => {
     setModelStates((prev) => ({
@@ -43,6 +48,17 @@ export default function ModelStatus() {
       await ai.loadModel(modelName, {
         onProgress: (data) => {
           setProgress((prev) => ({ ...prev, [modelName]: data.progress }));
+          if (data.speed || data.eta) {
+            setDownloadInfo((prev) => ({
+              ...prev,
+              [modelName]: {
+                speed: data.speed,
+                eta: data.eta,
+                bytesDownloaded: data.bytesDownloaded,
+                totalBytes: data.totalBytes,
+              },
+            }));
+          }
         },
       });
 
@@ -52,13 +68,23 @@ export default function ModelStatus() {
       }));
       setProgress((prev) => ({ ...prev, [modelName]: 100 }));
     } catch (err) {
-      console.error(`Failed to load ${modelName}:`, err);
+      if (err.message === 'Download cancelled by user') {
+        setModelStates((prev) => ({
+          ...prev,
+          [modelName]: { ...prev[modelName], loading: false },
+        }));
+        return;
+      }
+      setError(`Failed to load ${modelName}: ${err.message}`);
       setModelStates((prev) => ({
         ...prev,
         [modelName]: { ...prev[modelName], loaded: false, loading: false },
       }));
-      setError(`Failed to load ${modelName}: ${err.message}`);
     }
+  };
+
+  const cancelDownload = async (modelName) => {
+    await ai.cancelDownload(modelName);
   };
 
   const unloadModel = async (modelName) => {
@@ -145,12 +171,27 @@ export default function ModelStatus() {
             </div>
 
             {state.loading && (
-              <div className="w-full bg-slate-700 rounded-full h-1.5 mb-2">
-                <div
-                  className="bg-emerald-500 h-1.5 rounded-full transition-all duration-300"
-                  style={{ width: `${modelProgress}%` }}
-                />
-              </div>
+                <>
+                <div className="w-full bg-slate-700 rounded-full h-1.5 mb-2">
+                    <div
+                    className="bg-emerald-500 h-1.5 rounded-full transition-all duration-300"
+                    style={{ width: `${modelProgress}%` }}
+                    />
+                </div>
+                {downloadInfo[key] && (
+                    <div className="flex justify-between text-xs text-slate-500 mb-2">
+                    <span>{downloadInfo[key].speed || 'Starting...'}</span>
+                    <span>{downloadInfo[key].eta || 'Calculating...'}</span>
+                    </div>
+                )}
+                <button
+                    onClick={() => cancelDownload(key)}
+                    className="w-full px-3 py-1.5 text-xs bg-red-600/20 hover:bg-red-600/30 
+                            text-red-400 rounded-md transition-colors"
+                >
+                    Cancel Download
+                </button>
+                </>
             )}
 
             <div className="flex gap-2">
