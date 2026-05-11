@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { audio, ai } from '../workers/worker-bridge';
+import { ai } from '../workers/worker-bridge';
 
 export default function AudioRecorder({ onTranscriptionComplete }) {
   const [recordingState, setRecordingState] = useState('idle'); // idle | recording | paused | processing
@@ -8,6 +8,9 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
   const [audioLevel, setAudioLevel] = useState(0);
   const timerRef = useRef(null);
   const startTimeRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const streamRef = useRef(null);
+  const chunksRef = useRef([]);
 
   const updateDuration = useCallback(() => {
     if (startTimeRef.current) {
@@ -18,23 +21,69 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
   const startRecording = async () => {
     setError(null);
     setDuration(0);
+    chunksRef.current = [];
 
     try {
-      await audio.startRecording(
-        { mimeType: 'audio/webm;codecs=opus' },
-        {
-          onData: (data) => {
-            // Simulate audio level from chunk size
-            setAudioLevel(Math.min(100, (data.chunkSize / 1000) * 100));
-          },
-        }
-      );
+      // getUserMedia MUST be called on the main thread — not available in Workers
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error(
+          'Microphone access is not available. Make sure you are on localhost or HTTPS.'
+        );
+      }
 
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          sampleRate: 16000,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+
+      streamRef.current = stream;
+
+      // Pick a supported MIME type
+      const supportedTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/mp4',
+      ];
+      const mimeType =
+        supportedTypes.find((t) => MediaRecorder.isTypeSupported(t)) ||
+        'audio/webm';
+
+      const recorder = new MediaRecorder(stream, {
+        mimeType,
+        audioBitsPerSecond: 64000,
+      });
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunksRef.current.push(e.data);
+          setAudioLevel(Math.min(100, (e.data.size / 1000) * 100));
+        }
+      };
+
+      recorder.onerror = (e) => {
+        setError(e.error?.message || 'Recording error');
+        setRecordingState('idle');
+      };
+
+      recorder.start(1000);
       setRecordingState('recording');
       startTimeRef.current = Date.now();
       timerRef.current = setInterval(updateDuration, 1000);
     } catch (err) {
-      setError(err.message);
+      if (err.name === 'NotAllowedError') {
+        setError('Microphone access denied. Please allow microphone access in your browser settings.');
+      } else if (err.name === 'NotFoundError') {
+        setError('No microphone found. Please connect a microphone.');
+      } else {
+        setError(err.message);
+      }
     }
   };
 
@@ -42,44 +91,92 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
     clearInterval(timerRef.current);
     setRecordingState('processing');
 
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state === 'inactive') {
+      setRecordingState('idle');
+      return;
+    }
+
     try {
-      const result = await audio.stopRecording();
-      
-      // Send audio data to Whisper for transcription
-      if (result.audioData) {
-        const transcription = await ai.transcribeAudio(result.audioData, {
-          onProgress: (data) => {
-            console.log('Transcription progress:', data);
-          },
-        });
+      await new Promise((resolve, reject) => {
+        recorder.onstop = async () => {
+          try {
+            streamRef.current?.getTracks().forEach((t) => t.stop());
 
-        onTranscriptionComplete?.(transcription.text);
-      }
+            const mimeType = recorder.mimeType || 'audio/webm';
+            const blob = new Blob(chunksRef.current, { type: mimeType });
 
+            // Resample to 16 kHz Float32Array (main thread — OfflineAudioContext is available here)
+            const arrayBuffer = await blob.arrayBuffer();
+            const audioCtx = new AudioContext({ sampleRate: 16000 });
+            const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+            audioCtx.close();
+
+            let audioData;
+            if (decoded.sampleRate === 16000 && decoded.numberOfChannels === 1) {
+              audioData = decoded.getChannelData(0);
+            } else {
+              const offlineCtx = new OfflineAudioContext(
+                1,
+                Math.ceil(decoded.duration * 16000),
+                16000
+              );
+              const src = offlineCtx.createBufferSource();
+              src.buffer = decoded;
+              src.connect(offlineCtx.destination);
+              src.start(0);
+              const resampled = await offlineCtx.startRendering();
+              audioData = resampled.getChannelData(0);
+            }
+
+            // Send Float32Array to Whisper worker
+            const transcription = await ai.transcribeAudio(audioData, {
+              onProgress: (data) => console.log('Transcription progress:', data),
+            });
+
+            onTranscriptionComplete?.(transcription.text);
+            resolve();
+          } catch (err) {
+            reject(err);
+          }
+        };
+        recorder.stop();
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
       setRecordingState('idle');
       setDuration(0);
       setAudioLevel(0);
-    } catch (err) {
-      setError(err.message);
-      setRecordingState('idle');
+      chunksRef.current = [];
+      mediaRecorderRef.current = null;
+      streamRef.current = null;
     }
   };
 
-  const pauseRecording = async () => {
+  const pauseRecording = () => {
     clearInterval(timerRef.current);
-    await audio.pauseRecording();
+    mediaRecorderRef.current?.pause();
     setRecordingState('paused');
   };
 
-  const resumeRecording = async () => {
-    await audio.resumeRecording();
+  const resumeRecording = () => {
+    mediaRecorderRef.current?.resume();
     setRecordingState('recording');
     timerRef.current = setInterval(updateDuration, 1000);
   };
 
-  const cancelRecording = async () => {
+  const cancelRecording = () => {
     clearInterval(timerRef.current);
-    await audio.cancelRecording();
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.onstop = null;
+      recorder.stop();
+    }
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    chunksRef.current = [];
+    mediaRecorderRef.current = null;
+    streamRef.current = null;
     setRecordingState('idle');
     setDuration(0);
     setAudioLevel(0);
@@ -93,11 +190,10 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
 
   return (
     <div className="flex items-center gap-3">
-      {/* Recording Controls */}
       {recordingState === 'idle' && (
         <button
           onClick={startRecording}
-          className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 
+          className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600
                    text-slate-200 rounded-lg transition-colors text-sm"
           title="Record audio"
         >
@@ -108,18 +204,14 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
 
       {recordingState === 'recording' && (
         <div className="flex items-center gap-2">
-          {/* Audio level indicator */}
           <div className="flex items-center gap-1">
             <span className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
             </span>
-            <span className="text-xs text-red-400 font-mono">
-              {formatTime(duration)}
-            </span>
+            <span className="text-xs text-red-400 font-mono">{formatTime(duration)}</span>
           </div>
 
-          {/* Audio level bars */}
           <div className="flex items-end gap-0.5 h-5">
             {[1, 2, 3, 4, 5].map((i) => (
               <div
@@ -153,9 +245,7 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
 
       {recordingState === 'paused' && (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-yellow-400 font-mono">
-            ⏸ {formatTime(duration)}
-          </span>
+          <span className="text-xs text-yellow-400 font-mono">⏸ {formatTime(duration)}</span>
 
           <button
             onClick={resumeRecording}
@@ -190,24 +280,17 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
         </div>
       )}
 
-      {/* Error */}
       {error && (
         <div className="text-xs text-red-400 flex items-center gap-1">
           <span>⚠</span>
           <span>{error}</span>
-          <button
-            onClick={() => setError(null)}
-            className="text-red-500 hover:text-red-400"
-          >
-            ✕
-          </button>
+          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-400">✕</button>
         </div>
       )}
     </div>
   );
 }
 
-// SVG Icons
 function MicIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

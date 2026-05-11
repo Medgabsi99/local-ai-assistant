@@ -51,8 +51,21 @@ export default defineConfig({
       },
     }),
   ],
+  resolve: {
+    alias: {
+      // onnxruntime-web v1.14.0 has no true ESM build — all builds are UMD.
+      // Point to the ES6 UMD variant so Vite's dep-optimizer can wrap it into
+      // a proper ESM module (CJS→ESM transform). Without this alias Vite serves
+      // the raw UMD file which breaks in strict-mode ES module workers because
+      // `this` is undefined and the global `ort` object is never registered.
+      'onnxruntime-web': 'onnxruntime-web/dist/ort-web.es6.min.js',
+    },
+  },
   optimizeDeps: {
+    // Keep transformers.js itself out of pre-bundling (has WASM side-effects)
     exclude: ['@xenova/transformers'],
+    // But DO pre-bundle onnxruntime-web so Vite converts UMD → ESM wrapper
+    include: ['onnxruntime-web'],
   },
   worker: {
     format: 'es',

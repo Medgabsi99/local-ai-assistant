@@ -72,7 +72,7 @@ export default function ChatArea({ conversationId }) {
       // Run inference
       let fullResponse = '';
 
-      await ai.runInference(
+      const inferenceResult = await ai.runInference(
         {
           modelName: 'llm',
           input: userMessage,
@@ -81,7 +81,9 @@ export default function ChatArea({ conversationId }) {
         },
         {
           onToken: (token, fullText) => {
-            fullResponse = fullText || token;
+            // Accumulate tokens (fullText from worker is partial-decoded,
+            // so append the new token instead of overwriting)
+            fullResponse += token;
             setStreamingContent(fullResponse);
           },
           onProgress: (data) => {
@@ -90,8 +92,15 @@ export default function ChatArea({ conversationId }) {
         }
       );
 
+      // INFERENCE_COMPLETE carries the authoritative full result from the model.
+      // Use it when streaming tokens didn't fire (text2text-generation) or
+      // when the streamed accumulation drifted from the real output.
+      if (inferenceResult?.result) {
+        fullResponse = inferenceResult.result;
+      }
+
       // Save AI response
-      await addMessage(conversationId, 'assistant', fullResponse, {
+      await addMessage(conversationId, 'assistant', fullResponse || '(no response generated)', {
         model: 'local-llm',
         ragUsed: !!context,
         contextSources: context

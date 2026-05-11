@@ -6,10 +6,16 @@
 import { pipeline, env } from '@xenova/transformers';
 
 // Configure Transformers.js
-env.allowLocalModels = false;
-env.useBrowserCache = true;
-env.backends.onnx.wasm.proxy = false;
-env.useFSCache = true; // Enable file system cache for models
+// Note: env.backends is not available at module init time in Vite ES worker context,
+// so we only set the safe top-level flags here.
+try {
+  env.allowLocalModels = false;
+  env.useBrowserCache = true;
+  // proxy = false is the default inside a worker — no need to set it.
+  // env.backends.onnx.wasm.proxy = false; // ← caused "Cannot read properties of undefined"
+} catch (e) {
+  console.warn('Failed to configure transformers env:', e);
+}
 
 // Model configurations with version pins for cache busting
 const MODEL_CONFIGS = {
@@ -454,6 +460,10 @@ Answer:`;
     id,
   });
 
+  // Accumulate streamed tokens server-side so the client always gets a
+  // coherent growing string, not just an isolated decoded fragment.
+  let streamedText = '';
+
   try {
     // Try streaming generation
     const generator = await config.instance(prompt, {
@@ -464,15 +474,18 @@ Answer:`;
       no_repeat_ngram_size: 3,
       callback_function: (tokens) => {
         try {
-          const text = config.instance.tokenizer.decode(tokens[0], {
+          const piece = config.instance.tokenizer.decode(tokens[0], {
             skip_special_tokens: true,
           });
-          self.postMessage({
-            type: 'TOKEN',
-            token: text,
-            fullText: text,
-            id,
-          });
+          if (piece) {
+            streamedText += piece;
+            self.postMessage({
+              type: 'TOKEN',
+              token: piece,       // the new piece only
+              fullText: streamedText, // full accumulated text so far
+              id,
+            });
+          }
         } catch {
           // Decoding error - skip this token
         }
