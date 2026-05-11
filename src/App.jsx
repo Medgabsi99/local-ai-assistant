@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Layout from './components/Layout';
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 import DocumentPane from './components/DocumentPane';
+import SettingsModal from './components/SettingsModal';
 
 export default function App() {
   const [activeConversationId, setActiveConversationId] = useState(null);
-  const [activeView, setActiveView] = useState('chat'); // 'chat' | 'documents'
+  const [activeView, setActiveView] = useState('chat');
+  const [showSettings, setShowSettings] = useState(false);
 
   const handleSelectConversation = (id) => {
     setActiveConversationId(id);
@@ -24,6 +26,7 @@ export default function App() {
         activeConversationId={activeConversationId}
         onSelectConversation={handleSelectConversation}
         onNewConversation={handleNewConversation}
+        onOpenSettings={() => setShowSettings(true)}
       />
 
       {/* Main Content Area */}
@@ -59,6 +62,11 @@ export default function App() {
           <DocumentPane />
         )}
       </div>
+
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+      />
     </Layout>
   );
 }
