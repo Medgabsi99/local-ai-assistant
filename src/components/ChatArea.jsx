@@ -1,78 +1,112 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   getConversationMessages,
   addMessage,
+  updateConversationTitle,
 } from '../db/database';
-import { sendToWorker } from '../workers/worker-bridge';
+import { ai } from '../workers/worker-bridge';
+import { useRAG } from '../hooks/useRAG';
 
 export default function ChatArea({ conversationId }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
+  const [useRAGMode, setUseRAGMode] = useState(true);
+  const [retrievedContext, setRetrievedContext] = useState(null);
   const messagesEndRef = useRef(null);
+  const { searchSimilar } = useRAG();
 
-  useEffect(() => {
+  const loadMessages = useCallback(async () => {
     if (conversationId) {
-      loadMessages();
+      const msgs = await getConversationMessages(conversationId);
+      setMessages(msgs);
     } else {
       setMessages([]);
     }
   }, [conversationId]);
 
   useEffect(() => {
+    loadMessages();
+  }, [loadMessages]);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingContent]);
-
-  const loadMessages = async () => {
-    const msgs = await getConversationMessages(conversationId);
-    setMessages(msgs);
-  };
 
   const handleSend = async () => {
     if (!input.trim() || isGenerating) return;
 
     const userMessage = input.trim();
     setInput('');
+    setIsGenerating(true);
+    setStreamingContent('');
+    setRetrievedContext(null);
 
     // Add user message
     await addMessage(conversationId, 'user', userMessage);
     await loadMessages();
 
-    // Generate AI response
-    setIsGenerating(true);
-    setStreamingContent('');
-
-    let fullResponse = '';
-
     try {
-      await sendToWorker(
-        'RUN_INFERENCE',
+      let context = null;
+
+      // RAG: Search for relevant document chunks
+      if (useRAGMode) {
+        try {
+          const contexts = await searchSimilar(userMessage, 3);
+          if (contexts.length > 0) {
+            context = contexts.map((c) => c.content);
+            setRetrievedContext(contexts);
+          }
+        } catch (error) {
+          console.warn('RAG search failed, continuing without context:', error);
+        }
+      }
+
+      // Run inference
+      let fullResponse = '';
+
+      await ai.runInference(
         {
           modelName: 'llm',
           input: userMessage,
+          context: context,
+          maxTokens: 512,
         },
         {
-          onToken: (token) => {
-            fullResponse += token;
+          onToken: (token, fullText) => {
+            fullResponse = fullText || token;
             setStreamingContent(fullResponse);
+          },
+          onProgress: (data) => {
+            console.log('Generation progress:', data);
           },
         }
       );
 
-      // Save complete response
+      // Save AI response
       await addMessage(conversationId, 'assistant', fullResponse, {
         model: 'local-llm',
+        ragUsed: !!context,
+        contextSources: context
+          ? retrievedContext?.map((c) => c.documentTitle) || []
+          : [],
       });
+
       setStreamingContent('');
+
+      // Update conversation title if it's the first message
+      if (messages.length === 0) {
+        const title = userMessage.slice(0, 50) + (userMessage.length > 50 ? '...' : '');
+        await updateConversationTitle(conversationId, title);
+      }
+
       await loadMessages();
     } catch (error) {
-      await addMessage(
-        conversationId,
-        'assistant',
-        `Error: ${error.message}. Make sure the model is loaded in the sidebar.`,
-        { error: true }
-      );
+      console.error('Inference error:', error);
+      await addMessage(conversationId, 'assistant', `Error: ${error.message}. Make sure the model is loaded in the sidebar.`, {
+        error: true,
+      });
       await loadMessages();
     } finally {
       setIsGenerating(false);
@@ -86,7 +120,7 @@ export default function ChatArea({ conversationId }) {
     }
   };
 
-  // Welcome screen when no conversation is selected
+  // Welcome screen
   if (!conversationId) {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
@@ -97,11 +131,11 @@ export default function ChatArea({ conversationId }) {
           </h2>
           <p className="text-slate-400 mb-8">
             Your privacy-first AI that runs entirely on your device.
-            No data ever leaves your browser.
+            Upload documents and chat with them using RAG.
           </p>
           <div className="grid grid-cols-2 gap-4 text-left">
             <Feature icon="📄" title="Document Q&A" desc="Ask questions about your files" />
-            <Feature icon="🎤" title="Transcribe Audio" desc="Convert speech to text locally" />
+            <Feature icon="🧠" title="Local RAG" desc="Vector search in your browser" />
             <Feature icon="💬" title="Chat" desc="Conversations stored privately" />
             <Feature icon="📡" title="Works Offline" desc="No internet required" />
           </div>
@@ -112,6 +146,40 @@ export default function ChatArea({ conversationId }) {
 
   return (
     <div className="flex-1 flex flex-col h-full">
+      {/* RAG Toggle & Context Indicator */}
+      <div className="px-4 py-2 border-b border-slate-700 flex items-center justify-between bg-slate-800/30">
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={useRAGMode}
+              onChange={(e) => setUseRAGMode(e.target.checked)}
+              className="w-4 h-4 rounded border-slate-600 bg-slate-700 
+                       text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0"
+            />
+            <span className="text-xs text-slate-400">
+              🔍 RAG Mode (search documents)
+            </span>
+          </label>
+        </div>
+
+        {retrievedContext && retrievedContext.length > 0 && (
+          <div className="flex items-center gap-2 text-xs text-emerald-400">
+            <span>📎</span>
+            <span>
+              Using {retrievedContext.length} document chunk
+              {retrievedContext.length > 1 ? 's' : ''}
+            </span>
+            <button
+              onClick={() => setRetrievedContext(null)}
+              className="text-slate-500 hover:text-slate-300"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((msg) => (
@@ -121,8 +189,26 @@ export default function ChatArea({ conversationId }) {
           >
             <div className={msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai'}>
               <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+
+              {/* Show RAG sources */}
+              {msg.metadata?.contextSources?.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-slate-600/50">
+                  <p className="text-xs text-slate-400 mb-1">Sources:</p>
+                  {msg.metadata.contextSources.map((source, i) => (
+                    <span
+                      key={i}
+                      className="inline-block text-xs bg-slate-600 text-slate-300 
+                               px-2 py-0.5 rounded mr-1 mb-1"
+                    >
+                      📄 {source}
+                    </span>
+                  ))}
+                </div>
+              )}
+
               <p className="text-xs opacity-60 mt-1">
                 {new Date(msg.timestamp).toLocaleTimeString()}
+                {msg.metadata?.ragUsed && ' · RAG'}
               </p>
             </div>
           </div>
@@ -162,7 +248,11 @@ export default function ChatArea({ conversationId }) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type your message... (Enter to send, Shift+Enter for new line)"
+            placeholder={
+              useRAGMode
+                ? 'Ask about your documents... (Enter to send)'
+                : 'Type your message... (Enter to send)'
+            }
             rows={1}
             className="flex-1 bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-sm
                      text-slate-100 placeholder-slate-500 resize-none
