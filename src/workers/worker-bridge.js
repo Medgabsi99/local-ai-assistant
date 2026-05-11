@@ -1,9 +1,10 @@
 // ============================================================
-// Worker Bridge - Clean async communication
+// Worker Bridge - Clean async communication for all workers
 // ============================================================
 
 let aiWorker = null;
 let pdfWorker = null;
+let audioWorker = null;
 let pendingRequests = new Map();
 let requestId = 0;
 
@@ -27,6 +28,16 @@ function getPDFWorker() {
   return pdfWorker;
 }
 
+function getAudioWorker() {
+  if (!audioWorker) {
+    audioWorker = new Worker(new URL('./audio-processor.js', import.meta.url), {
+      type: 'module',
+    });
+    audioWorker.onmessage = handleMessage;
+  }
+  return audioWorker;
+}
+
 function handleMessage(event) {
   const { id, type } = event.data;
   const pending = pendingRequests.get(id);
@@ -39,6 +50,7 @@ function handleMessage(event) {
     return;
   }
 
+  // Streaming tokens
   if (type === 'TOKEN') {
     if (pending.onToken) {
       pending.onToken(event.data.token, event.data.fullText);
@@ -46,6 +58,7 @@ function handleMessage(event) {
     return;
   }
 
+  // Progress updates
   if (type === 'PROGRESS') {
     if (pending.onProgress) {
       pending.onProgress(event.data);
@@ -53,17 +66,39 @@ function handleMessage(event) {
     return;
   }
 
-  // Terminal states
+  // Recording data chunks (streaming audio)
+  if (type === 'RECORDING_DATA') {
+    if (pending.onData) {
+      pending.onData(event.data);
+    }
+    return;
+  }
+
+  // Terminal states for all workers
   const terminalTypes = [
+    // AI Worker
     'MODEL_LOADED',
     'MODEL_STATUS',
+    'ALL_MODEL_STATUSES',
     'MODEL_UNLOADED',
+    'ALL_MODELS_UNLOADED',
+    'DOWNLOAD_CANCELLED',
+    'CANCEL_ACKNOWLEDGED',
+    'DOWNLOAD_PROGRESS_ALL',
     'INFERENCE_COMPLETE',
     'EMBEDDING_RESULT',
     'EMBEDDINGS_BATCH_RESULT',
     'TRANSCRIPTION_RESULT',
+    // PDF Worker
     'EXTRACTION_COMPLETE',
     'CHUNK_COMPLETE',
+    // Audio Worker
+    'RECORDING_STARTED',
+    'RECORDING_COMPLETE',
+    'RECORDING_PAUSED',
+    'RECORDING_RESUMED',
+    'RECORDING_CANCELLED',
+    'RECORDING_STATUS',
   ];
 
   if (terminalTypes.includes(type)) {
@@ -82,6 +117,7 @@ function send(workerGetter, type, payload, callbacks = {}) {
       reject,
       onToken: callbacks.onToken,
       onProgress: callbacks.onProgress,
+      onData: callbacks.onData,
     });
 
     worker.postMessage({ type, payload, id });
@@ -92,6 +128,9 @@ function send(workerGetter, type, payload, callbacks = {}) {
 export const ai = {
   loadModel: (modelName, callbacks) =>
     send(getAIWorker, 'LOAD_MODEL', { modelName }, callbacks),
+
+  cancelDownload: (modelName) =>
+    send(getAIWorker, 'CANCEL_DOWNLOAD', { modelName }),
 
   runInference: (payload, callbacks) =>
     send(getAIWorker, 'RUN_INFERENCE', payload, callbacks),
@@ -105,11 +144,20 @@ export const ai = {
   checkModel: (modelName) =>
     send(getAIWorker, 'CHECK_MODEL', { modelName }),
 
+  checkAllModels: () =>
+    send(getAIWorker, 'CHECK_ALL_MODELS', {}),
+
   unloadModel: (modelName) =>
     send(getAIWorker, 'UNLOAD_MODEL', { modelName }),
 
+  unloadAll: () =>
+    send(getAIWorker, 'UNLOAD_ALL', {}),
+
   transcribeAudio: (audioData, callbacks) =>
     send(getAIWorker, 'TRANSCRIBE_AUDIO', { audioData }, callbacks),
+
+  getDownloadProgress: () =>
+    send(getAIWorker, 'GET_DOWNLOAD_PROGRESS', {}),
 };
 
 // PDF Worker API
@@ -121,15 +169,36 @@ export const pdf = {
     send(getPDFWorker, 'CHUNK_TEXT', { text, options }, callbacks),
 };
 
+// Audio Worker API
+export const audio = {
+  startRecording: (options, callbacks) =>
+    send(getAudioWorker, 'START_RECORDING', options || {}, callbacks),
+
+  stopRecording: (callbacks) =>
+    send(getAudioWorker, 'STOP_RECORDING', {}, callbacks),
+
+  pauseRecording: () =>
+    send(getAudioWorker, 'PAUSE_RECORDING', {}),
+
+  resumeRecording: () =>
+    send(getAudioWorker, 'RESUME_RECORDING', {}),
+
+  getStatus: () =>
+    send(getAudioWorker, 'GET_RECORDING_STATUS', {}),
+
+  cancelRecording: () =>
+    send(getAudioWorker, 'CANCEL_RECORDING', {}),
+};
+
 // Cleanup
 export function terminateAll() {
-  if (aiWorker) {
-    aiWorker.terminate();
-    aiWorker = null;
-  }
-  if (pdfWorker) {
-    pdfWorker.terminate();
-    pdfWorker = null;
-  }
+  [aiWorker, pdfWorker, audioWorker].forEach((worker) => {
+    if (worker) {
+      worker.terminate();
+    }
+  });
+  aiWorker = null;
+  pdfWorker = null;
+  audioWorker = null;
   pendingRequests.clear();
 }
