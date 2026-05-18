@@ -87,7 +87,7 @@ The app works **offline** after the initial model download and can be **installe
 
 ## Demo
 
-> 📸 *Screenshot coming soon — see [Getting Started](#getting-started) to run it locally.*
+![Local AI Assistant Demo](screenshots/demo.png)
 
 ---
 
@@ -332,4 +332,4 @@ Project Link: [https://github.com/Medgabsi99/local-ai-assistant](https://github.
 [pwa-shield]: https://img.shields.io/badge/PWA-Ready-blueviolet?style=for-the-badge&logo=pwa
 [pwa-url]: https://github.com/Medgabsi99/local-ai-assistant
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=0077B5
-[linkedin-url]: https://linkedin.com/in/your-linkedin-profile
+[linkedin-url]: https://www.linkedin.com/in/mohamed-laroussi-gabsi-6b8397240/
