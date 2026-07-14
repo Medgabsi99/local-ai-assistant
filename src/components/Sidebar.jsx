@@ -31,36 +31,24 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
   const [showArchived, setShowArchived] = useState(false);
   const [renaming, setRenaming] = useState(null);
   const [renameVal, setRenameVal] = useState('');
-  const [downloadProgress, setDownloadProgress] = useState(0);
-  const [downloadTotal, setDownloadTotal] = useState(0);
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [anyLoading, setAnyLoading] = useState(false);
   const renameRef = useRef(null);
 
   const load = async () => { setConversations(await getAllConversations()); };
   useEffect(() => { load(); }, [activeConversationId]);
   
-  // Check download progress
+  // Check if any model is currently downloading
   useEffect(() => {
     const check = async () => {
       try {
-        const r = await ai.getDownloadProgress();
-        let total = 0, done = 0, anyLoading = false;
-        if (r?.downloads) {
-          for (const [key, dl] of Object.entries(r.downloads)) {
-            if (dl.status === 'downloading') {
-              anyLoading = true;
-              total += dl.totalBytes || 0;
-              done += dl.bytesDownloaded || 0;
-            }
-          }
+        const r = await ai.checkAllModels();
+        if (r?.statuses) {
+          setAnyLoading(Object.values(r.statuses).some(s => s.loading));
         }
-        setIsDownloading(anyLoading);
-        setDownloadTotal(total);
-        setDownloadProgress(done);
       } catch {}
     };
     check();
-    const i = setInterval(check, 2000);
+    const i = setInterval(check, 3000);
     return () => clearInterval(i);
   }, []);
   useEffect(() => { if (renaming) renameRef.current?.select(); }, [renaming]);
@@ -114,9 +102,9 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
       <div className="p-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
         <h1 className="font-bold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
           <span className="w-6 h-6 rounded-lg bg-emerald-500/20 flex items-center justify-center text-xs">🔒</span> {t('app_name')}
-          {isDownloading && (
-            <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full whitespace-nowrap">
-              {downloadTotal > 0 ? `${Math.round((downloadProgress / downloadTotal) * 100)}%` : '...'}
+          {anyLoading && (
+            <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full whitespace-nowrap animate-pulse">
+              ⬇
             </span>
           )}
         </h1>

@@ -6,6 +6,7 @@ import {
   saveDocumentChunks,
   getDocumentChunks,
 } from '../db/database';
+import { hybridSearch } from '../lib/hybrid-search';
 
 export function useRAG() {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -141,7 +142,7 @@ export function useRAG() {
     }
   }, []);
 
-  // Search for relevant context
+  // Search for relevant context using hybrid BM25 + vector re-ranking
   const searchSimilar = useCallback(async (query, topK = 3) => {
     const store = await getStore();
 
@@ -149,24 +150,46 @@ export function useRAG() {
     const result = await ai.getEmbedding(query);
     const queryEmbedding = result.embedding;
 
-    // Search vector store
-    const matches = await store.search(queryEmbedding, topK, 0.3);
+    // Fetch more candidates (topK * 3) so re-ranking has better pool
+    const matches = await store.search(queryEmbedding, topK * 3, 0.2);
 
-    // Fetch full chunk content from IndexedDB
-    const contexts = [];
+    // Fetch all matching chunks from IndexedDB
+    const allChunks = [];
+    const seenDocChunks = new Set();
+    
     for (const match of matches) {
       if (match.metadata.documentId && match.metadata.chunkIndex !== undefined) {
-        const chunks = await getDocumentChunks(match.metadata.documentId);
-        const chunk = chunks.find((c) => c.chunkIndex === match.metadata.chunkIndex);
-        if (chunk) {
-          contexts.push({
-            content: chunk.content,
-            documentTitle: match.metadata.documentTitle,
-            similarity: match.similarity,
-          });
+        const key = `${match.metadata.documentId}-${match.metadata.chunkIndex}`;
+        if (!seenDocChunks.has(key)) {
+          seenDocChunks.add(key);
+          const chunks = await getDocumentChunks(match.metadata.documentId);
+          const chunk = chunks.find((c) => c.chunkIndex === match.metadata.chunkIndex);
+          if (chunk) {
+            allChunks.push({
+              content: chunk.content,
+              metadata: {
+                documentId: match.metadata.documentId,
+                documentTitle: match.metadata.documentTitle,
+                chunkIndex: match.metadata.chunkIndex,
+              },
+              similarity: match.similarity,
+            });
+          }
         }
       }
     }
+
+    // Run hybrid re-ranking (BM25 + vector similarity fusion)
+    const reRanked = await hybridSearch(query, allChunks, allChunks, 0.6);
+
+    // Return topK results with normalized scores
+    const contexts = reRanked.slice(0, topK).map((match) => ({
+      content: match.content,
+      documentTitle: match.metadata?.documentTitle || '',
+      similarity: match.similarity || 0,
+      bm25Score: match.bm25Score || 0,
+      vectorScore: match.vectorScore || 0,
+    }));
 
     return contexts;
   }, []);
