@@ -27,6 +27,7 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
   const [conversations, setConversations] = useState([]);
   const [collapsed, setCollapsed] = useState(false);
   const [search, setSearch] = useState('');
+  const [showArchived, setShowArchived] = useState(false);
   const [renaming, setRenaming] = useState(null);
   const [renameVal, setRenameVal] = useState('');
   const renameRef = useRef(null);
@@ -47,7 +48,11 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
   const finishRename = async () => { if (renaming && renameVal.trim()) { await updateConversationTitle(renaming, renameVal.trim()); await load(); } setRenaming(null); setRenameVal(''); };
   const handleRenameKey = (e) => { if (e.key === 'Enter') finishRename(); if (e.key === 'Escape') setRenaming(null); };
 
-  const filtered = conversations.filter((c) => c.title.toLowerCase().includes(search.toLowerCase()) || !search);
+  const filtered = conversations.filter((c) => {
+    if (showArchived !== !!c.archived) return false;
+    if (search && !c.title.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
 
   const grouped = {};
   for (const c of filtered) {
@@ -103,6 +108,11 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('search_conv')}
           className="w-full h-8 text-xs px-3 rounded-lg outline-none focus:border-emerald-500/50 transition-colors"
           style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+        <button onClick={() => setShowArchived(!showArchived)}
+          className={`w-full mt-1.5 text-[10px] px-2 py-1 rounded-md transition-colors ${showArchived ? 'bg-emerald-500/20 text-emerald-300' : ''}`}
+          style={{ background: showArchived ? undefined : 'var(--bg-hover)', color: showArchived ? undefined : 'var(--text-muted)' }}>
+          📦 {showArchived ? t('chat') : 'Archived'} ({conversations.filter(c => c.archived).length})
+        </button>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-2 space-y-0.5">
@@ -142,7 +152,7 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
                         const a = document.createElement('a'); a.href = url; a.download = `${conv.title.slice(0, 30).replace(/[^a-z0-9]/gi, '_')}.md`;
                         a.click(); URL.revokeObjectURL(url);
                       }} className="w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-slate-200 hover:bg-white/5" title={t('share')}>⬇</button>
-                      <button onClick={async (e) => { e.stopPropagation(); await archiveConversation(conv.id); await load(); if (activeConversationId === conv.id) onNewConversation(null); }} className="w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-slate-200 hover:bg-white/5" title="Archive">📦</button>
+                      <button onClick={async (e) => { e.stopPropagation(); await archiveConversation(conv.id, !showArchived); await load(); if (activeConversationId === conv.id) onNewConversation(null); }} className="w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-slate-200 hover:bg-white/5" title={showArchived ? 'Restore' : 'Archive'}>{showArchived ? '↩' : '📦'}</button>
                       <button onClick={(e) => del(e, conv.id)} className="w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-red-400 hover:bg-white/5" title={t('del')}>
                         <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 4h10l-1 11H4L3 4zM6 4V2h4v2M2 4h12"/></svg>
                       </button>
