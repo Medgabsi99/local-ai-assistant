@@ -10,12 +10,15 @@ import {
   updateConversationTitle,
   getSetting,
   setSetting,
+  toggleMessageStar,
 } from "../db/database";
 import { ai } from "../workers/worker-bridge";
 import { useRAG } from "../hooks/useRAG";
 import { getServerConfig, generate } from "../lib/llm-server";
 import { searchWeb } from "../lib/web-search";
 import { t } from "../lib/i18n";
+import { detectTool, executeTool } from "../lib/agent-tools";
+import { useToast } from "../App";
 import AudioRecorder from "./AudioRecorder";
 
 function CodeBlock({ className, children }) {
@@ -35,6 +38,7 @@ function CodeBlock({ className, children }) {
 }
 
 export default function ChatArea({ conversationId }) {
+  const toast = useToast();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -55,6 +59,7 @@ export default function ChatArea({ conversationId }) {
   const [showShareModal, setShowShareModal] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [webResults, setWebResults] = useState(null);
+  const [agentMode, setAgentMode] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -95,11 +100,17 @@ export default function ChatArea({ conversationId }) {
   useEffect(() => { if (activeSearchId) { const el = document.getElementById(`msg-${activeSearchId}`); el?.scrollIntoView({ behavior: "smooth", block: "center" }); } }, [activeSearchId, searchIndex]);
 
   const stopGeneration = () => { setIsGenerating(false); };
-  const copyMessage = async (content) => { try { await navigator.clipboard.writeText(content); } catch {} };
+  const copyMessage = async (content) => { try { await navigator.clipboard.writeText(content); toast?.(t('copy'), 'success'); } catch {} };
   const startEdit = (msg) => { setEditingMessageId(msg.id); setEditContent(msg.content); };
   const cancelEdit = () => { setEditingMessageId(null); setEditContent(""); };
   const saveEdit = async (msgId) => { if (!editContent.trim()) return; await deleteMessage(msgId); await addMessage(conversationId, "user", editContent.trim()); setEditingMessageId(null); setEditContent(""); await loadMessages(); await sendMessage(editContent.trim()); };
-  const deleteMsg = async (msgId) => { await deleteMessage(msgId); await loadMessages(); };
+  const deleteMsg = async (msgId) => { await deleteMessage(msgId); await loadMessages(); toast?.(t('del'), 'success'); };
+  
+  const toggleStar = async (msgId) => {
+    await toggleMessageStar(msgId);
+    await loadMessages();
+  };
+
   const insertMarkdown = (before, after = "") => {
     const el = inputRef.current;
     if (!el) return;
@@ -108,10 +119,7 @@ export default function ChatArea({ conversationId }) {
     const selected = input.substring(start, end);
     const newText = input.substring(0, start) + before + selected + after + input.substring(end);
     setInput(newText);
-    setTimeout(() => {
-      el.focus();
-      el.setSelectionRange(start + before.length, start + before.length + selected.length);
-    }, 0);
+    setTimeout(() => { el.focus(); el.setSelectionRange(start + before.length, start + before.length + selected.length); }, 0);
   };
 
   const handleSend = () => { if (!input.trim() || isGenerating) return; const msg = input.trim(); setInput(""); sendMessage(msg); };
@@ -125,10 +133,9 @@ export default function ChatArea({ conversationId }) {
       let context = null;
       if (useRAGMode) { try { const c = await searchSimilar(userMessage, 3); if (c.length > 0) { context = c.map(x => x.content); setRetrievedContext(c); } } catch (e) { console.warn("RAG:", e); } }
       let webContext = null;
-      if (webSearchEnabled && (!context || context.length === 0)) {
-        const results = await searchWeb(userMessage);
-        if (results?.length) { webContext = results.map(r => `[${r.title}] ${r.snippet}`).join("\n\n"); setWebResults(results); }
-      }
+      let agentResult = null;
+      if (agentMode) { const toolCall = detectTool(userMessage); if (toolCall) { agentResult = await executeTool(toolCall); } }
+      if (webSearchEnabled && (!context || context.length === 0)) { const results = await searchWeb(userMessage); if (results?.length) { webContext = results.map(r => `[${r.title}] ${r.snippet}`).join("\n\n"); setWebResults(results); } }
       const serverConfig = getServerConfig();
       const useServer = serverConfig.enabled;
       let fullResponse = ""; let usedModel = "browser";
@@ -147,8 +154,9 @@ export default function ChatArea({ conversationId }) {
         for (const msg of recent) history += msg.role === "user" ? `${msg.content}\n` : `${msg.content}\n`;
         if (history.length > 500) history = "...\n" + history.slice(-500);
         prompt += history;
+        if (agentResult) prompt += `Tool result: ${agentResult}\n\n`;
         if (context?.length) prompt += `Context:\n${context.join("\n\n")}\n\n`;
-        if (webContext) prompt += `Web results:\n${webContext}\n\n`;
+        if (webContext) prompt += `Web search results:\n${webContext}\n\n`;
         prompt += `Question: ${userMessage}\nAnswer:`;
         const result = await ai.runInference({ modelName: "llm", input: prompt, maxTokens: 512, temperature: 0.3 }, { onToken: (t) => { fullResponse += t; setStreamingContent(fullResponse); } });
         if (result?.result) fullResponse = result.result;
@@ -202,6 +210,7 @@ export default function ChatArea({ conversationId }) {
           <button onClick={() => { setWebSearchEnabled(!webSearchEnabled); setWebResults(null); }} className={`text-xs px-2 py-1 rounded-md hover:bg-white/5 transition-colors ${webSearchEnabled ? "bg-emerald-500/20 text-emerald-400" : ""}`} style={{ color: webSearchEnabled ? undefined : "var(--text-muted)" }} title={t('web_search')}>🌐</button>
           <button onClick={() => setShowSearch(!showSearch)} className="text-xs px-2 py-1 rounded-md hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('search')}>🔍</button>
           <button onClick={toggleTheme} className="text-xs px-2 py-1 rounded-md hover:bg-white/5" style={{ color: "var(--text-muted)" }}>{theme === "dark" ? "☀️" : "🌙"}</button>
+          <button onClick={() => setAgentMode(!agentMode)} className={`text-xs px-2 py-1 rounded-md hover:bg-white/5 transition-colors ${agentMode ? "bg-emerald-500/20 text-emerald-400" : ""}`} style={{ color: agentMode ? undefined : "var(--text-muted)" }} title="Agent">{t('system')}</button>
           <button onClick={() => setShowTemplates(!showTemplates)} className="text-xs px-2 py-1 rounded-md hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('prompt_templates')}>📋</button>
           {messages.length > 0 && <button onClick={() => setShowShareModal(true)} className="text-xs px-2 py-1 rounded-md hover:bg-white/5" style={{ color: "var(--text-muted)" }}>{t('share')}</button>}
           {messages.length > 1 && <button onClick={regenerate} disabled={isGenerating} className="text-xs disabled:opacity-40 px-2 py-1 rounded-md hover:bg-white/5" style={{ color: "var(--text-muted)" }}>{t('regenerate')}</button>}
@@ -242,8 +251,8 @@ export default function ChatArea({ conversationId }) {
             <button onClick={() => setShowShareModal(false)} className="text-xs px-2 py-0.5 rounded hover:bg-white/5" style={{ color: "var(--text-muted)" }}>✕</button>
           </div>
           <div className="flex gap-2">
-            <button onClick={async () => { await navigator.clipboard.writeText(messages.map(m => `${m.role === "user" ? t('copy') : "AI"}:\n${m.content}`).join("\n\n")); setShowShareModal(false); }} className="text-[11px] px-3 py-1.5 rounded-md bg-emerald-500 hover:bg-emerald-400 text-white">{t('share_copy')}</button>
-            <button onClick={async () => { const md = messages.map(m => `### ${m.role === "user" ? t('copy') : "AI"}\n${m.content}`).join("\n\n---\n\n"); const b = new Blob([md], { type: "text/markdown" }); const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = `chat-${new Date().toISOString().slice(0, 10)}.md`; a.click(); URL.revokeObjectURL(u); setShowShareModal(false); }} className="text-[11px] px-3 py-1.5 rounded-md hover:bg-white/5" style={{ background: "var(--bg-hover)", color: "var(--text-secondary)" }}>{t('share_download')}</button>
+            <button onClick={async () => { await navigator.clipboard.writeText(messages.map(m => `${m.role === "user" ? "User" : "AI"}:\n${m.content}`).join("\n\n")); setShowShareModal(false); toast?.(t('share_copy'), 'success'); }} className="text-[11px] px-3 py-1.5 rounded-md bg-emerald-500 hover:bg-emerald-400 text-white">{t('share_copy')}</button>
+            <button onClick={async () => { const md = messages.map(m => `### ${m.role === "user" ? "User" : "AI"}\n${m.content}`).join("\n\n---\n\n"); const b = new Blob([md], { type: "text/markdown" }); const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = `chat-${new Date().toISOString().slice(0, 10)}.md`; a.click(); URL.revokeObjectURL(u); setShowShareModal(false); }} className="text-[11px] px-3 py-1.5 rounded-md hover:bg-white/5" style={{ background: "var(--bg-hover)", color: "var(--text-secondary)" }}>{t('share_download')}</button>
           </div>
         </div>
       )}
@@ -271,6 +280,7 @@ export default function ChatArea({ conversationId }) {
               )}
               {editingMessageId !== msg.id && (
                 <div className={`flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <button onClick={() => toggleStar(msg.id)} className="text-[10px] px-1.5 py-0.5 rounded hover:bg-white/5" style={{ color: msg.metadata?.starred ? "#f59e0b" : "var(--text-muted)" }} title={msg.metadata?.starred ? t('del') : t('del')}>{msg.metadata?.starred ? "⭐" : "☆"}</button>
                   {msg.role === "assistant" && (
                     <button onClick={() => { if ("speechSynthesis" in window) { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(msg.content.replace(/<[^>]*>/g, "")); const voices = window.speechSynthesis.getVoices(); const v = voices.find(x => x.name.includes("Google UK Female") || x.name.includes("Microsoft Zira") || x.name.includes("Samantha")) || voices.find(x => x.lang.startsWith("en") && x.name.includes("Female")) || voices.find(x => x.lang.startsWith("en")); if (v) u.voice = v; u.rate = 1.05; u.pitch = 1.05; window.speechSynthesis.speak(u); } }} className="text-[10px] px-1.5 py-0.5 rounded hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('read_aloud')}>🔊</button>
                   )}
@@ -280,6 +290,7 @@ export default function ChatArea({ conversationId }) {
                   <span className="text-[10px] ml-1" style={{ color: "var(--text-muted)" }}>
                     {msg.metadata?.timeMs ? `${(msg.metadata.timeMs / 1000).toFixed(1)}s · ` : ""}
                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    {msg.metadata?.starred && " ⭐"}
                   </span>
                 </div>
               )}
@@ -311,15 +322,14 @@ export default function ChatArea({ conversationId }) {
       </div>
 
       <div className="px-4 py-3 border-t flex-shrink-0" style={{ borderColor: "var(--border)", background: "var(--bg-primary)" }}>
-        {/* Markdown toolbar */}
         <div className="flex items-center gap-0.5 mb-2 flex-wrap">
-          <button onClick={() => insertMarkdown("**", "**")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title="Bold"><strong>B</strong></button>
-          <button onClick={() => insertMarkdown("*", "*")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title="Italic"><em>I</em></button>
-          <button onClick={() => insertMarkdown("`", "`")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title="Code">{"<>"}</button>
-          <button onClick={() => insertMarkdown("[", "](url)")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title="Link">🔗</button>
-          <button onClick={() => insertMarkdown("- ")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title="List">•</button>
-          <button onClick={() => insertMarkdown("```\n", "\n```")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title="Code block">📄</button>
-          <span className="text-[10px] ml-auto" style={{ color: "var(--text-muted)" }}>Markdown</span>
+          <button onClick={() => insertMarkdown("**", "**")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('settings')}><strong>B</strong></button>
+          <button onClick={() => insertMarkdown("*", "*")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('settings')}><em>I</em></button>
+          <button onClick={() => insertMarkdown("`", "`")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('settings')}>{"<>"}</button>
+          <button onClick={() => insertMarkdown("[", "](url)")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('settings')}>🔗</button>
+          <button onClick={() => insertMarkdown("- ")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('settings')}>•</button>
+          <button onClick={() => insertMarkdown("```\n", "\n```")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('settings')}>📄</button>
+          <span className="text-[10px] ml-auto" style={{ color: "var(--text-muted)" }}>{t('settings')}</span>
         </div>
         <div className="flex gap-2 max-w-4xl mx-auto">
           <AudioRecorder onTranscriptionComplete={handleTranscription} />
@@ -332,7 +342,6 @@ export default function ChatArea({ conversationId }) {
             )}
           </div>
         </div>
-        {/* Auto-scroll button */}
         {showScrollBtn && (
           <button onClick={() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); setShowScrollBtn(false); }}
             className="fixed bottom-20 right-8 z-30 w-10 h-10 flex items-center justify-center rounded-full bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/30 transition-all animate-fade-in">

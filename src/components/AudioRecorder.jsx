@@ -229,7 +229,7 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
           <button
             onClick={pauseRecording}
             className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors"
-            title="Pause"
+            title={t('settings')}
           >
             <PauseIcon />
           </button>
@@ -237,7 +237,7 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
           <button
             onClick={stopRecording}
             className="p-1.5 bg-red-600 hover:bg-red-500 rounded text-white transition-colors"
-            title="Stop"
+            title={t('settings')}
           >
             <StopIcon />
           </button>
@@ -251,7 +251,7 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
           <button
             onClick={resumeRecording}
             className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors"
-            title="Resume"
+            title={t('settings')}
           >
             <PlayIcon />
           </button>
@@ -259,7 +259,7 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
           <button
             onClick={stopRecording}
             className="p-1.5 bg-red-600 hover:bg-red-500 rounded text-white transition-colors"
-            title="Stop"
+            title={t('settings')}
           >
             <StopIcon />
           </button>
@@ -267,7 +267,7 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
           <button
             onClick={cancelRecording}
             className="p-1.5 hover:bg-slate-700 rounded text-slate-500 hover:text-slate-300 transition-colors"
-            title="Cancel"
+            title={t('settings')}
           >
             <XIcon />
           </button>
@@ -277,7 +277,7 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
       {recordingState === 'processing' && (
         <div className="flex items-center gap-2 text-xs text-slate-400">
           <span className="animate-spin">⏳</span>
-          <span>Transcribing...</span>
+          <span>{t('download')}</span>
         </div>
       )}
 

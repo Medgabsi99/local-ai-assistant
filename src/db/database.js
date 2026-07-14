@@ -221,6 +221,15 @@ export async function updateConversationTitle(id, title) {
   });
 }
 
+export async function toggleMessageStar(id) {
+  const msg = await db.messages.get(id);
+  if (!msg) return;
+  const starred = !msg.metadata?.starred;
+  return db.messages.update(id, {
+    metadata: { ...(msg.metadata || {}), starred },
+  });
+}
+
 export async function toggleConversationPinned(id, pinned) {
   return db.conversations.update(id, {
     pinned: Boolean(pinned),
