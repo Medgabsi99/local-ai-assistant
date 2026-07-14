@@ -8,6 +8,7 @@ import {
   updateDocument,
 } from "../db/database";
 import { useRAG } from "../hooks/useRAG";
+import PdfViewer from "./PdfViewer";
 
 export default function DocumentPane() {
   const [documents, setDocuments] = useState([]);
@@ -149,9 +150,16 @@ export default function DocumentPane() {
               </div>
               {(selectedDocument?.tags || []).length > 0 && <div className="mt-3 flex flex-wrap gap-1">{selectedDocument.tags.map((tag) => <span key={tag} className="rounded-full px-2 py-0.5 text-xs" style={{ background: 'var(--accent-light)', color: 'var(--accent)' }}>#{tag}</span>)}</div>}
             </div>
-            <div className="rounded-xl p-6" style={{ background: 'var(--bg-card)' }}>
-              <pre className="text-sm whitespace-pre-wrap font-sans leading-relaxed" style={{ color: 'var(--text-primary)' }}>{docContent.slice(0, 10000)}</pre>
-            </div>
+            {selectedDocument?.fileType === "application/pdf" ? (
+              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)', height: '70vh' }}>
+                <PdfViewer docContent={docContent} />
+              </div>
+            ) : (
+              <div className="rounded-xl p-6" style={{ background: 'var(--bg-card)' }}>
+                <pre className="text-sm whitespace-pre-wrap font-sans leading-relaxed" style={{ color: 'var(--text-primary)' }}>{docContent.slice(0, 10000)}</pre>
+                {docContent.length > 10000 && <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>... (showing first 10,000 characters)</p>}
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex items-center justify-center h-full">

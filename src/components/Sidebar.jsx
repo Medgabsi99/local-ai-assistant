@@ -6,6 +6,7 @@ import {
   deleteConversation,
   updateConversationTitle,
   toggleConversationPinned,
+  archiveConversation,
   getConversationMessages,
 } from '../db/database';
 import ModelStatus from './ModelStatus';
@@ -141,6 +142,7 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
                         const a = document.createElement('a'); a.href = url; a.download = `${conv.title.slice(0, 30).replace(/[^a-z0-9]/gi, '_')}.md`;
                         a.click(); URL.revokeObjectURL(url);
                       }} className="w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-slate-200 hover:bg-white/5" title={t('share')}>⬇</button>
+                      <button onClick={async (e) => { e.stopPropagation(); await archiveConversation(conv.id); await load(); if (activeConversationId === conv.id) onNewConversation(null); }} className="w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-slate-200 hover:bg-white/5" title="Archive">📦</button>
                       <button onClick={(e) => del(e, conv.id)} className="w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-red-400 hover:bg-white/5" title={t('del')}>
                         <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 4h10l-1 11H4L3 4zM6 4V2h4v2M2 4h12"/></svg>
                       </button>

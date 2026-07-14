@@ -228,6 +228,14 @@ export async function toggleConversationPinned(id, pinned) {
   });
 }
 
+export async function archiveConversation(id, archived = true) {
+  return db.conversations.update(id, { archived, updatedAt: new Date().toISOString() });
+}
+
+export async function getAllActiveConversations() {
+  return db.conversations.where("archived").notEqual(true).reverse().sortBy("updatedAt");
+}
+
 function normalizeTags(tags) {
   if (!Array.isArray(tags)) return [];
 

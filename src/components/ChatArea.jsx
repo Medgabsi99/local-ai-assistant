@@ -55,6 +55,7 @@ export default function ChatArea({ conversationId }) {
   const [showShareModal, setShowShareModal] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [webResults, setWebResults] = useState(null);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const messagesRef = useRef(null);
@@ -81,7 +82,13 @@ export default function ChatArea({ conversationId }) {
   useEffect(() => { if (!isGenerating) inputRef.current?.focus(); }, [isGenerating]);
   useEffect(() => { if (showSearch) searchInputRef.current?.focus(); }, [showSearch]);
 
-  const handleScroll = useCallback(() => { const el = messagesRef.current; if (!el) return; setUserScrolledUp(el.scrollHeight - el.scrollTop - el.clientHeight > 80); }, []);
+  const handleScroll = useCallback(() => {
+    const el = messagesRef.current;
+    if (!el) return;
+    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    setUserScrolledUp(!isAtBottom);
+    setShowScrollBtn(!isAtBottom && messages.length > 0);
+  }, [messages.length]);
   const filteredMessages = useMemo(() => { if (!searchQuery.trim()) return messages; const q = searchQuery.toLowerCase(); return messages.filter(m => m.content.toLowerCase().includes(q)); }, [messages, searchQuery]);
   const searchResults = searchQuery.trim() ? filteredMessages : [];
   const activeSearchId = searchResults.length > 0 ? searchResults[searchIndex]?.id : null;
@@ -93,6 +100,20 @@ export default function ChatArea({ conversationId }) {
   const cancelEdit = () => { setEditingMessageId(null); setEditContent(""); };
   const saveEdit = async (msgId) => { if (!editContent.trim()) return; await deleteMessage(msgId); await addMessage(conversationId, "user", editContent.trim()); setEditingMessageId(null); setEditContent(""); await loadMessages(); await sendMessage(editContent.trim()); };
   const deleteMsg = async (msgId) => { await deleteMessage(msgId); await loadMessages(); };
+  const insertMarkdown = (before, after = "") => {
+    const el = inputRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const selected = input.substring(start, end);
+    const newText = input.substring(0, start) + before + selected + after + input.substring(end);
+    setInput(newText);
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(start + before.length, start + before.length + selected.length);
+    }, 0);
+  };
+
   const handleSend = () => { if (!input.trim() || isGenerating) return; const msg = input.trim(); setInput(""); sendMessage(msg); };
 
   const sendMessage = async (userMessage) => {
@@ -290,6 +311,16 @@ export default function ChatArea({ conversationId }) {
       </div>
 
       <div className="px-4 py-3 border-t flex-shrink-0" style={{ borderColor: "var(--border)", background: "var(--bg-primary)" }}>
+        {/* Markdown toolbar */}
+        <div className="flex items-center gap-0.5 mb-2 flex-wrap">
+          <button onClick={() => insertMarkdown("**", "**")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title="Bold"><strong>B</strong></button>
+          <button onClick={() => insertMarkdown("*", "*")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title="Italic"><em>I</em></button>
+          <button onClick={() => insertMarkdown("`", "`")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title="Code">{"<>"}</button>
+          <button onClick={() => insertMarkdown("[", "](url)")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title="Link">🔗</button>
+          <button onClick={() => insertMarkdown("- ")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title="List">•</button>
+          <button onClick={() => insertMarkdown("```\n", "\n```")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title="Code block">📄</button>
+          <span className="text-[10px] ml-auto" style={{ color: "var(--text-muted)" }}>Markdown</span>
+        </div>
         <div className="flex gap-2 max-w-4xl mx-auto">
           <AudioRecorder onTranscriptionComplete={handleTranscription} />
           <div className="flex-1 flex gap-2">
@@ -301,6 +332,13 @@ export default function ChatArea({ conversationId }) {
             )}
           </div>
         </div>
+        {/* Auto-scroll button */}
+        {showScrollBtn && (
+          <button onClick={() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); setShowScrollBtn(false); }}
+            className="fixed bottom-20 right-8 z-30 w-10 h-10 flex items-center justify-center rounded-full bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/30 transition-all animate-fade-in">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+        )}
       </div>
     </div>
   );
