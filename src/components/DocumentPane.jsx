@@ -77,8 +77,8 @@ export default function DocumentPane() {
   };
 
   return (
-    <div className="flex h-full">
-      <div className="w-80 border-r border-slate-700 flex flex-col">
+    <div className="flex flex-col md:flex-row h-full">
+      <div className="w-full md:w-80 border-r border-slate-700 flex flex-col md:max-h-full max-h-[40vh]">
         <div className="p-4 border-b border-slate-700" onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('bg-emerald-500/5'); }} onDragLeave={(e) => { e.currentTarget.classList.remove('bg-emerald-500/5'); }} onDrop={(e) => { e.preventDefault(); e.currentTarget.classList.remove('bg-emerald-500/5'); const file = e.dataTransfer.files[0]; if (file) { const input = document.querySelector('input[type="file"]'); if (input) { const dt = new DataTransfer(); dt.items.add(file); input.files = dt.files; input.dispatchEvent(new Event('change', { bubbles: true })); } } }}>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{t('documents')}</h2>
@@ -107,7 +107,7 @@ export default function DocumentPane() {
             </div>
           )}
           {storeStats && storeStats.totalVectors > 0 && (
-            <div className="text-xs" style={{ color: 'var(--text-muted)' }}><p>📊 {storeStats.totalVectors} vectors</p><p>📁 {storeStats.totalDocuments} {t('documents')}</p></div>
+            <div className="text-xs" style={{ color: 'var(--text-muted)' }}><p>📊 {storeStats.totalVectors} {t('vectors')}</p><p>📁 {storeStats.totalDocuments} {t('documents')}</p></div>
           )}
           {documents.length > 0 && searchQuery.trim() && <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>{storeStats?.totalDocuments} {t('documents')}</p>}
         </div>
@@ -134,7 +134,7 @@ export default function DocumentPane() {
           ))}
         </div>
       </div>
-      <div className="flex-1 p-4 overflow-y-auto">
+      <div className="flex-1 p-4 overflow-y-auto min-w-0">
         {selectedDoc && docContent ? (
           <div>
             <div className="flex items-center justify-between mb-4">
@@ -142,10 +142,10 @@ export default function DocumentPane() {
               <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{(docContent.length / 1000).toFixed(1)} KB · {docContent.split(/\s+/).length} words</span>
             </div>
             <div className="mb-4 rounded-xl p-4" style={{ border: '1px solid var(--border)', background: 'var(--bg-secondary)' }}>
-              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Tags</p>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Separate with commas.</p>
+              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{t('tags')}</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('separate_with')}</p>
               <div className="flex gap-2 mt-2">
-                <textarea value={tagInput} onChange={(e) => setTagInput(e.target.value)} placeholder="research, pdf, ideas" rows={2} className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500" style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+                <textarea value={tagInput} onChange={(e) => setTagInput(e.target.value)} placeholder={t('tags_placeholder')} rows={2} className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500" style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
                 <button onClick={handleSaveTags} className="rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-2 text-xs font-medium text-white">{t('save')}</button>
               </div>
               {(selectedDocument?.tags || []).length > 0 && <div className="mt-3 flex flex-wrap gap-1">{selectedDocument.tags.map((tag) => <span key={tag} className="rounded-full px-2 py-0.5 text-xs" style={{ background: 'var(--accent-light)', color: 'var(--accent)' }}>#{tag}</span>)}</div>}

@@ -5,8 +5,11 @@ import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 import DocumentPane from './components/DocumentPane';
 import SettingsModal from './components/SettingsModal';
-import { t } from './lib/i18n';
+import { t, setLanguage, getLanguage } from './lib/i18n';
 import { createConversation } from './db/database';
+
+const LangContext = createContext();
+export function useLang() { return useContext(LangContext); }
 
 const ToastContext = createContext();
 export function useToast() { return useContext(ToastContext); }
@@ -42,6 +45,7 @@ export default function App() {
   const [activeView, setActiveView] = useState('chat');
   const [showSettings, setShowSettings] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [lang, setLang] = useState(getLanguage());
 
   useEffect(() => {
     const handleKey = async (e) => {
@@ -55,11 +59,13 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKey);
   }, []);
 
+  const switchLang = (newLang) => { setLanguage(newLang); setLang(newLang); };
   const handleSelectConversation = (id) => { setActiveConversationId(id); setActiveView('chat'); setMobileMenuOpen(false); };
   const handleNewConversation = (id) => { setActiveConversationId(id); setActiveView('chat'); setMobileMenuOpen(false); };
 
   return (
     <ErrorBoundary>
+      <LangContext.Provider value={{ lang, switchLang }}>
       <ToastProvider>
         <Layout>
           <button className="md:hidden fixed top-3 left-3 z-50 w-9 h-9 flex items-center justify-center rounded-xl bg-slate-800 border border-slate-700 shadow-lg" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
@@ -93,6 +99,7 @@ export default function App() {
           <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
         </Layout>
       </ToastProvider>
+      </LangContext.Provider>
     </ErrorBoundary>
   );
 }

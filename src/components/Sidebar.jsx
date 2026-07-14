@@ -133,7 +133,7 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
         <button onClick={() => setShowArchived(!showArchived)}
           className={`w-full mt-1.5 text-[10px] px-2 py-1 rounded-md transition-colors ${showArchived ? 'bg-emerald-500/20 text-emerald-300' : ''}`}
           style={{ background: showArchived ? undefined : 'var(--bg-hover)', color: showArchived ? undefined : 'var(--text-muted)' }}>
-          📦 {showArchived ? t('chat') : 'Archived'} ({conversations.filter(c => c.archived).length})
+          📦 {showArchived ? t('chat') : t('archived')} ({conversations.filter(c => c.archived).length})
         </button>
       </div>
 

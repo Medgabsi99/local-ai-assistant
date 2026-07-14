@@ -20,6 +20,7 @@ import { t } from "../lib/i18n";
 import { detectTool, executeTool } from "../lib/agent-tools";
 import { useToast } from "../App";
 import AudioRecorder from "./AudioRecorder";
+import { MessageSkeleton } from "./Skeleton";
 
 function CodeBlock({ className, children }) {
   const match = /language-(\w+)/.exec(className || "");
@@ -55,6 +56,7 @@ export default function ChatArea({ conversationId }) {
   const [searchIndex, setSearchIndex] = useState(0);
   const [theme, setTheme] = useState("dark");
   const [embeddingModelReady, setEmbeddingModelReady] = useState(false);
+  const [modelsLoading, setModelsLoading] = useState(true);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
@@ -75,7 +77,7 @@ export default function ChatArea({ conversationId }) {
     if (accentS?.value) document.documentElement.setAttribute("data-accent", accentS.value);
   })(); }, []);
 
-  useEffect(() => { let c = false; const check = async () => { try { const r = await ai.checkModel("embedding"); if (!c) setEmbeddingModelReady(r?.loaded || false); } catch {} }; check(); const i = setInterval(check, 3000); return () => { c = true; clearInterval(i); }; }, []);
+  useEffect(() => { let c = false; const check = async () => { try { const r = await ai.checkAllModels(); if (!c) { const anyLoaded = Object.values(r.statuses || {}).some(s => s.loaded || s.loading); setModelsLoading(!anyLoaded); setEmbeddingModelReady(r.statuses?.embedding?.loaded || false); } } catch {} }; check(); const i = setInterval(check, 3000); return () => { c = true; clearInterval(i); }; }, []);
   useEffect(() => { document.documentElement.classList.toggle("light", theme === "light"); }, [theme]);
 
   const toggleTheme = async () => { const n = theme === "dark" ? "light" : "dark"; setTheme(n); await setSetting("theme", n); };
@@ -210,7 +212,7 @@ export default function ChatArea({ conversationId }) {
           <button onClick={() => { setWebSearchEnabled(!webSearchEnabled); setWebResults(null); }} className={`text-xs px-2 py-1 rounded-md hover:bg-white/5 transition-colors ${webSearchEnabled ? "bg-emerald-500/20 text-emerald-400" : ""}`} style={{ color: webSearchEnabled ? undefined : "var(--text-muted)" }} title={t('web_search')}>🌐</button>
           <button onClick={() => setShowSearch(!showSearch)} className="text-xs px-2 py-1 rounded-md hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('search')}>🔍</button>
           <button onClick={toggleTheme} className="text-xs px-2 py-1 rounded-md hover:bg-white/5" style={{ color: "var(--text-muted)" }}>{theme === "dark" ? "☀️" : "🌙"}</button>
-          <button onClick={() => setAgentMode(!agentMode)} className={`text-xs px-2 py-1 rounded-md hover:bg-white/5 transition-colors ${agentMode ? "bg-emerald-500/20 text-emerald-400" : ""}`} style={{ color: agentMode ? undefined : "var(--text-muted)" }} title="Agent">{t('system')}</button>
+          <button onClick={() => setAgentMode(!agentMode)} className={`text-xs px-2 py-1 rounded-md hover:bg-white/5 transition-colors ${agentMode ? "bg-emerald-500/20 text-emerald-400" : ""}`} style={{ color: agentMode ? undefined : "var(--text-muted)" }} title={t('agent_mode')}>{t('system')}</button>
           <button onClick={() => setShowTemplates(!showTemplates)} className="text-xs px-2 py-1 rounded-md hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('prompt_templates')}>📋</button>
           {messages.length > 0 && <button onClick={() => setShowShareModal(true)} className="text-xs px-2 py-1 rounded-md hover:bg-white/5" style={{ color: "var(--text-muted)" }}>{t('share')}</button>}
           {messages.length > 1 && <button onClick={regenerate} disabled={isGenerating} className="text-xs disabled:opacity-40 px-2 py-1 rounded-md hover:bg-white/5" style={{ color: "var(--text-muted)" }}>{t('regenerate')}</button>}
@@ -258,7 +260,13 @@ export default function ChatArea({ conversationId }) {
       )}
 
       <div ref={messagesRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-5 space-y-4">
-        {messages.length === 0 && !isGenerating && <div className="flex items-center justify-center h-full"><p className="text-sm" style={{ color: "var(--text-muted)" }}>{t('no_messages')}</p></div>}
+        {modelsLoading && messages.length === 0 && !isGenerating && (
+          <div className="space-y-4 pt-4">
+            <MessageSkeleton />
+            <MessageSkeleton />
+          </div>
+        )}
+        {!modelsLoading && messages.length === 0 && !isGenerating && <div className="flex items-center justify-center h-full"><p className="text-sm" style={{ color: "var(--text-muted)" }}>{t('no_messages')}</p></div>}
         {messages.map((msg) => (
           <div key={msg.id} id={`msg-${msg.id}`} className={`group flex ${msg.role === "user" ? "justify-end" : "justify-start"} animate-fade-in ${activeSearchId === msg.id ? "ring-2 ring-emerald-500/40 ring-offset-2 rounded-xl" : ""}`} style={{ ringOffsetColor: "var(--bg-primary)" }}>
             <div className="max-w-[80%]">
@@ -280,7 +288,7 @@ export default function ChatArea({ conversationId }) {
               )}
               {editingMessageId !== msg.id && (
                 <div className={`flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <button onClick={() => toggleStar(msg.id)} className="text-[10px] px-1.5 py-0.5 rounded hover:bg-white/5" style={{ color: msg.metadata?.starred ? "#f59e0b" : "var(--text-muted)" }} title={msg.metadata?.starred ? t('del') : t('del')}>{msg.metadata?.starred ? "⭐" : "☆"}</button>
+                  <button onClick={() => toggleStar(msg.id)} className="text-[10px] px-1.5 py-0.5 rounded hover:bg-white/5" style={{ color: msg.metadata?.starred ? "#f59e0b" : "var(--text-muted)" }} title={msg.metadata?.starred ? t('unstar') : t('star')}>{msg.metadata?.starred ? "⭐" : "☆"}</button>
                   {msg.role === "assistant" && (
                     <button onClick={() => { if ("speechSynthesis" in window) { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(msg.content.replace(/<[^>]*>/g, "")); const voices = window.speechSynthesis.getVoices(); const v = voices.find(x => x.name.includes("Google UK Female") || x.name.includes("Microsoft Zira") || x.name.includes("Samantha")) || voices.find(x => x.lang.startsWith("en") && x.name.includes("Female")) || voices.find(x => x.lang.startsWith("en")); if (v) u.voice = v; u.rate = 1.05; u.pitch = 1.05; window.speechSynthesis.speak(u); } }} className="text-[10px] px-1.5 py-0.5 rounded hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('read_aloud')}>🔊</button>
                   )}
@@ -323,13 +331,13 @@ export default function ChatArea({ conversationId }) {
 
       <div className="px-4 py-3 border-t flex-shrink-0" style={{ borderColor: "var(--border)", background: "var(--bg-primary)" }}>
         <div className="flex items-center gap-0.5 mb-2 flex-wrap">
-          <button onClick={() => insertMarkdown("**", "**")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('settings')}><strong>B</strong></button>
-          <button onClick={() => insertMarkdown("*", "*")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('settings')}><em>I</em></button>
-          <button onClick={() => insertMarkdown("`", "`")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('settings')}>{"<>"}</button>
-          <button onClick={() => insertMarkdown("[", "](url)")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('settings')}>🔗</button>
-          <button onClick={() => insertMarkdown("- ")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('settings')}>•</button>
-          <button onClick={() => insertMarkdown("```\n", "\n```")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('settings')}>📄</button>
-          <span className="text-[10px] ml-auto" style={{ color: "var(--text-muted)" }}>{t('settings')}</span>
+          <button onClick={() => insertMarkdown("**", "**")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('bold')}><strong>B</strong></button>
+          <button onClick={() => insertMarkdown("*", "*")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('italic')}><em>I</em></button>
+          <button onClick={() => insertMarkdown("`", "`")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('code')}>{"<>"}</button>
+          <button onClick={() => insertMarkdown("[", "](url)")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('link')}>🔗</button>
+          <button onClick={() => insertMarkdown("- ")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('list')}>•</button>
+          <button onClick={() => insertMarkdown("```\n", "\n```")} className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5" style={{ color: "var(--text-muted)" }} title={t('code_block')}>📄</button>
+          <span className="text-[10px] ml-auto" style={{ color: "var(--text-muted)" }}>{t('markdown')}</span>
         </div>
         <div className="flex gap-2 max-w-4xl mx-auto">
           <AudioRecorder onTranscriptionComplete={handleTranscription} />

@@ -1,7 +1,7 @@
 const translations = {
   en: {
     app_name: 'Local AI', chat: 'Chat', documents: 'Documents', settings: 'Settings',
-    new_chat: 'New Chat', search_conv: 'Search conversations...', download: 'Download',
+    new_chat: 'New Chat', search_conv: 'Search...', download: 'Download',
     unload: 'Unload (Free memory)', cancel: 'Cancel', save: 'Save', clear: 'Clear',
     send: 'Send', thinking: 'Thinking...', system_prompt: 'System prompt (guides AI behavior):',
     rag_mode: 'RAG Mode', load_embedding_warning: '⚠️ Load Embedding Model in sidebar',
@@ -31,6 +31,14 @@ const translations = {
     translate_fr: 'Translate and answer in French.', step_by_step: 'Break down your answer into steps.',
     cancel_label: 'Cancel', save_send: 'Save & Send',
     prompt_templates: 'Templates',
+    pause: 'Pause', stop: 'Stop', resume: 'Resume', record_cancel: 'Cancel',
+    transcribing: 'Transcribing...', bold: 'Bold', italic: 'Italic', code: 'Code',
+    link: 'Link', list: 'List', code_block: 'Code block', markdown: 'Markdown',
+    star: 'Star', unstar: 'Unstar', archive: 'Archive', restore: 'Restore',
+    export_json: 'Export JSON', rename: 'Rename', pin: 'Pin', unpin: 'Unpin',
+    agent_mode: 'Agent mode', archived: 'Archived',
+    tags: 'Tags', separate_with: 'Separate with commas.',
+    tags_placeholder: 'research, pdf, ideas', vectors: 'vectors',
   },
   fr: {
     app_name: 'IA Locale', chat: 'Discussion', documents: 'Documents', settings: 'Paramètres',
@@ -63,6 +71,14 @@ const translations = {
     concise: 'Répondez de manière concise.', expert: 'Fournissez des réponses détaillées avec exemples.',
     translate_fr: 'Traduisez et répondez en français.', step_by_step: 'Détaillez votre réponse étape par étape.',
     cancel_label: 'Annuler', save_send: 'Enregistrer & Envoyer', prompt_templates: 'Modèles',
+    pause: 'Pause', stop: 'Arrêter', resume: 'Reprendre', record_cancel: 'Annuler',
+    transcribing: 'Transcription...', bold: 'Gras', italic: 'Italique', code: 'Code',
+    link: 'Lien', list: 'Liste', code_block: 'Bloc code', markdown: 'Markdown',
+    star: 'Favori', unstar: 'Retirer favori', archive: 'Archiver', restore: 'Restaurer',
+    export_json: 'Exporter JSON', rename: 'Renommer', pin: 'Épingler', unpin: 'Détacher',
+    agent_mode: 'Mode agent', archived: 'Archivé',
+    tags: 'Étiquettes', separate_with: 'Séparez par des virgules.',
+    tags_placeholder: 'recherche, pdf, idées', vectors: 'vecteurs',
   },
   ar: {
     app_name: 'الذكاء المحلي', chat: 'المحادثة', documents: 'المستندات', settings: 'الإعدادات',
@@ -92,6 +108,14 @@ const translations = {
     concise: 'أجب بإيجاز.', expert: 'قدم إجابات متعمقة مع أمثلة.',
     translate_fr: 'ترجم وأجب بالفرنسية.', step_by_step: 'قسّم إجابتك إلى خطوات.',
     cancel_label: 'إلغاء', save_send: 'حفظ وإرسال', prompt_templates: 'قوالب',
+    pause: 'إيقاف مؤقت', stop: 'إيقاف', resume: 'استئناف', record_cancel: 'إلغاء',
+    transcribing: 'جاري النسخ...', bold: 'عريض', italic: 'مائل', code: 'كود',
+    link: 'رابط', list: 'قائمة', code_block: 'كتلة كود', markdown: 'ماركداون',
+    star: 'نجمة', unstar: 'إزالة النجمة', archive: 'أرشفة', restore: 'استعادة',
+    export_json: 'تصدير JSON', rename: 'إعادة تسمية', pin: 'تثبيت', unpin: 'فك التثبيت',
+    agent_mode: 'وضع الوكيل', archived: 'مؤرشف',
+    tags: 'وسوم', separate_with: 'افصل بينها بفواصل.',
+    tags_placeholder: 'بحث، pdf، أفكار', vectors: 'متجهات',
   },
 };
 

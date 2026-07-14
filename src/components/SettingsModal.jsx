@@ -4,6 +4,7 @@ import { db, exportAppData, importAppData, getConversationMessages } from "../db
 import { getVectorStore } from "../lib/vector-store-access";
 import { getServerConfig, setServerConfig, checkServer } from "../lib/llm-server";
 import { t, setLanguage, getLanguage, getLanguages } from "../lib/i18n";
+import { useLang } from "../App";
 import VectorStoreManager from "./VectorStoreManager";
 
 export default function SettingsModal({ isOpen, onClose }) {
@@ -14,6 +15,7 @@ export default function SettingsModal({ isOpen, onClose }) {
   const importInputRef = useRef(null);
   const [serverCfg, setServerCfg] = useState(getServerConfig());
   const [srvStatus, setSrvStatus] = useState({ checking: false, result: null });
+  const { switchLang } = useLang();
   const [stats, setStats] = useState({ totalConversations: 0, totalMessages: 0, totalTokens: 0, totalDocuments: 0 });
 
   useEffect(() => {
@@ -128,7 +130,7 @@ export default function SettingsModal({ isOpen, onClose }) {
               <h3 className="text-sm font-medium text-slate-300 mb-3">🌐 {t('settings')}</h3>
               <div className="flex gap-2">
                 {getLanguages().map((lang) => (
-                  <button key={lang} onClick={() => { setLanguage(lang); window.location.reload(); }}
+                  <button key={lang} onClick={() => { switchLang(lang); }}
                     className={`px-3 py-1.5 text-xs rounded-md font-medium transition-all ${getLanguage() === lang ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40' : ''}`}
                     style={{ background: getLanguage() === lang ? undefined : 'var(--bg-hover)', color: getLanguage() === lang ? undefined : 'var(--text-secondary)' }}>
                     {lang === 'en' ? 'English' : lang === 'fr' ? 'Français' : 'العربية'}
