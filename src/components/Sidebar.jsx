@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { t } from "../lib/i18n";
+import { ai } from '../workers/worker-bridge';
 import {
   getAllConversations,
   createConversation,
@@ -30,10 +31,38 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
   const [showArchived, setShowArchived] = useState(false);
   const [renaming, setRenaming] = useState(null);
   const [renameVal, setRenameVal] = useState('');
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadTotal, setDownloadTotal] = useState(0);
+  const [isDownloading, setIsDownloading] = useState(false);
   const renameRef = useRef(null);
 
   const load = async () => { setConversations(await getAllConversations()); };
   useEffect(() => { load(); }, [activeConversationId]);
+  
+  // Check download progress
+  useEffect(() => {
+    const check = async () => {
+      try {
+        const r = await ai.getDownloadProgress();
+        let total = 0, done = 0, anyLoading = false;
+        if (r?.downloads) {
+          for (const [key, dl] of Object.entries(r.downloads)) {
+            if (dl.status === 'downloading') {
+              anyLoading = true;
+              total += dl.totalBytes || 0;
+              done += dl.bytesDownloaded || 0;
+            }
+          }
+        }
+        setIsDownloading(anyLoading);
+        setDownloadTotal(total);
+        setDownloadProgress(done);
+      } catch {}
+    };
+    check();
+    const i = setInterval(check, 2000);
+    return () => clearInterval(i);
+  }, []);
   useEffect(() => { if (renaming) renameRef.current?.select(); }, [renaming]);
 
   const newChat = async () => {
@@ -85,6 +114,11 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
       <div className="p-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
         <h1 className="font-bold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
           <span className="w-6 h-6 rounded-lg bg-emerald-500/20 flex items-center justify-center text-xs">🔒</span> {t('app_name')}
+          {isDownloading && (
+            <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+              {downloadTotal > 0 ? `${Math.round((downloadProgress / downloadTotal) * 100)}%` : '...'}
+            </span>
+          )}
         </h1>
         <div className="flex items-center gap-0.5">
           <button onClick={onOpenSettings} className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-white/5" title={t('settings')}>
@@ -146,12 +180,12 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
                       <button onClick={async (e) => {
                         e.stopPropagation();
                         const msgs = await getConversationMessages(conv.id);
-                        const text = msgs.map(m => `${m.role === 'user' ? 'You' : 'AI'}:\n${m.content}`).join('\n\n---\n\n');
-                        const blob = new Blob([text], { type: 'text/markdown' });
+                        const json = JSON.stringify({ title: conv.title, messages: msgs, exportedAt: new Date().toISOString() }, null, 2);
+                        const blob = new Blob([json], { type: 'application/json' });
                         const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a'); a.href = url; a.download = `${conv.title.slice(0, 30).replace(/[^a-z0-9]/gi, '_')}.md`;
+                        const a = document.createElement('a'); a.href = url; a.download = `${conv.title.slice(0, 30).replace(/[^a-z0-9]/gi, '_')}.json`;
                         a.click(); URL.revokeObjectURL(url);
-                      }} className="w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-slate-200 hover:bg-white/5" title={t('share')}>⬇</button>
+                      }} className="w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-slate-200 hover:bg-white/5" title="Export JSON">📋</button>
                       <button onClick={async (e) => { e.stopPropagation(); await archiveConversation(conv.id, !showArchived); await load(); if (activeConversationId === conv.id) onNewConversation(null); }} className="w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-slate-200 hover:bg-white/5" title={showArchived ? 'Restore' : 'Archive'}>{showArchived ? '↩' : '📦'}</button>
                       <button onClick={(e) => del(e, conv.id)} className="w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-red-400 hover:bg-white/5" title={t('del')}>
                         <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 4h10l-1 11H4L3 4zM6 4V2h4v2M2 4h12"/></svg>
