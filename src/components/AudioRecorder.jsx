@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { ai } from '../workers/worker-bridge';
+import { t } from '../lib/i18n';
 
 export default function AudioRecorder({ onTranscriptionComplete }) {
   const [recordingState, setRecordingState] = useState('idle'); // idle | recording | paused | processing
@@ -195,10 +196,10 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
           onClick={startRecording}
           className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600
                    text-slate-200 rounded-lg transition-colors text-sm"
-          title="Record audio"
+          title={t('read_aloud')}
         >
           <MicIcon />
-          <span>Record</span>
+          <span>{t('upload')}</span>
         </button>
       )}
 

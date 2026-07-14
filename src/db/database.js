@@ -1,15 +1,16 @@
-import Dexie from 'dexie';
+import Dexie from "dexie";
+import { getVectorStore } from "../lib/vector-store-access";
 
 class LocalAIDatabase extends Dexie {
   constructor() {
-    super('LocalAIDB');
+    super("LocalAIDB");
 
-    this.version(2).stores({
-      documents: '++id, title, fileType, createdAt, updatedAt',
-      documentChunks: '++id, documentId, chunkIndex',
-      conversations: '++id, title, createdAt, updatedAt',
-      messages: '++id, conversationId, role, content, timestamp, metadata',
-      settings: 'key',
+    this.version(4).stores({
+      documents: "++id, title, fileType, createdAt, updatedAt, *tags",
+      documentChunks: "++id, documentId, chunkIndex",
+      conversations: "++id, title, createdAt, updatedAt, pinned",
+      messages: "++id, conversationId, role, content, timestamp, metadata",
+      settings: "key",
     });
   }
 }
@@ -17,12 +18,18 @@ class LocalAIDatabase extends Dexie {
 export const db = new LocalAIDatabase();
 
 // Document helpers
-export async function saveDocument({ title, content, fileType = 'text/plain' }) {
+export async function saveDocument({
+  title,
+  content,
+  fileType = "text/plain",
+  tags = [],
+}) {
   const now = new Date().toISOString();
   return db.documents.add({
     title,
     content,
     fileType,
+    tags: normalizeTags(tags),
     createdAt: now,
     updatedAt: now,
   });
@@ -31,12 +38,13 @@ export async function saveDocument({ title, content, fileType = 'text/plain' }) 
 export async function updateDocument(id, updates) {
   return db.documents.update(id, {
     ...updates,
+    ...(updates.tags ? { tags: normalizeTags(updates.tags) } : {}),
     updatedAt: new Date().toISOString(),
   });
 }
 
 export async function getAllDocuments() {
-  return db.documents.orderBy('updatedAt').reverse().toArray();
+  return db.documents.orderBy("updatedAt").reverse().toArray();
 }
 
 export async function getDocument(id) {
@@ -44,8 +52,84 @@ export async function getDocument(id) {
 }
 
 export async function deleteDocument(id) {
-  await db.documentChunks.where('documentId').equals(id).delete();
+  await db.documentChunks.where("documentId").equals(id).delete();
   return db.documents.delete(id);
+}
+
+export async function deleteDocumentVectors(id) {
+  const store = await getVectorStore();
+  await store.deleteVectorsByDocumentId(id);
+}
+
+export async function exportAppData() {
+  const [documents, documentChunks, conversations, messages, settings] =
+    await Promise.all([
+      db.documents.toArray(),
+      db.documentChunks.toArray(),
+      db.conversations.toArray(),
+      db.messages.toArray(),
+      db.settings.toArray(),
+    ]);
+
+  return {
+    schemaVersion: 1,
+    exportedAt: new Date().toISOString(),
+    documents,
+    documentChunks,
+    conversations,
+    messages,
+    settings,
+  };
+}
+
+export async function importAppData(payload) {
+  const documents = Array.isArray(payload?.documents) ? payload.documents : [];
+  const documentChunks = Array.isArray(payload?.documentChunks)
+    ? payload.documentChunks
+    : [];
+  const conversations = Array.isArray(payload?.conversations)
+    ? payload.conversations
+    : [];
+  const messages = Array.isArray(payload?.messages) ? payload.messages : [];
+  const settings = Array.isArray(payload?.settings) ? payload.settings : [];
+
+  await db.transaction(
+    "rw",
+    db.documents,
+    db.documentChunks,
+    db.conversations,
+    db.messages,
+    db.settings,
+    async () => {
+      await Promise.all([
+        db.documents.clear(),
+        db.documentChunks.clear(),
+        db.conversations.clear(),
+        db.messages.clear(),
+        db.settings.clear(),
+      ]);
+
+      if (documents.length > 0) {
+        await db.documents.bulkPut(documents);
+      }
+
+      if (documentChunks.length > 0) {
+        await db.documentChunks.bulkPut(documentChunks);
+      }
+
+      if (conversations.length > 0) {
+        await db.conversations.bulkPut(conversations);
+      }
+
+      if (messages.length > 0) {
+        await db.messages.bulkPut(messages);
+      }
+
+      if (settings.length > 0) {
+        await db.settings.bulkPut(settings);
+      }
+    },
+  );
 }
 
 // Document chunk helpers
@@ -60,9 +144,9 @@ export async function saveDocumentChunks(documentId, chunks) {
 
 export async function getDocumentChunks(documentId) {
   return db.documentChunks
-    .where('documentId')
+    .where("documentId")
     .equals(documentId)
-    .sortBy('chunkIndex');
+    .sortBy("chunkIndex");
 }
 
 export async function getAllChunks() {
@@ -70,10 +154,11 @@ export async function getAllChunks() {
 }
 
 // Conversation helpers
-export async function createConversation(title = 'New Chat') {
+export async function createConversation(title = "New Chat") {
   const now = new Date().toISOString();
   return db.conversations.add({
     title,
+    pinned: false,
     createdAt: now,
     updatedAt: now,
   });
@@ -92,19 +177,31 @@ export async function addMessage(conversationId, role, content, metadata = {}) {
   });
 }
 
+export async function deleteMessage(id) {
+  return db.messages.delete(id);
+}
+
 export async function getConversationMessages(conversationId) {
   return db.messages
-    .where('conversationId')
+    .where("conversationId")
     .equals(conversationId)
-    .sortBy('timestamp');
+    .sortBy("timestamp");
 }
 
 export async function getAllConversations() {
-  return db.conversations.orderBy('updatedAt').reverse().toArray();
+  const conversations = await db.conversations.toArray();
+
+  return conversations.sort((a, b) => {
+    const pinnedDifference =
+      Number(Boolean(b.pinned)) - Number(Boolean(a.pinned));
+    if (pinnedDifference !== 0) return pinnedDifference;
+
+    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+  });
 }
 
 export async function deleteConversation(id) {
-  await db.messages.where('conversationId').equals(id).delete();
+  await db.messages.where("conversationId").equals(id).delete();
   return db.conversations.delete(id);
 }
 
@@ -124,3 +221,17 @@ export async function updateConversationTitle(id, title) {
   });
 }
 
+export async function toggleConversationPinned(id, pinned) {
+  return db.conversations.update(id, {
+    pinned: Boolean(pinned),
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+function normalizeTags(tags) {
+  if (!Array.isArray(tags)) return [];
+
+  return [
+    ...new Set(tags.map((tag) => String(tag).trim()).filter(Boolean)),
+  ].slice(0, 20);
+}

@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 export function usePWAInstall() {
   const [installPrompt, setInstallPrompt] = useState(null);
-  const [isInstalled, setIsInstalled] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(
+    () => window.matchMedia("(display-mode: standalone)").matches,
+  );
   const [showPrompt, setShowPrompt] = useState(false);
 
   useEffect(() => {
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setIsInstalled(true);
+    if (isInstalled) {
       return;
     }
 
@@ -17,18 +18,21 @@ export function usePWAInstall() {
       setShowPrompt(true);
     };
 
-    window.addEventListener('beforeinstallprompt', handler);
+    window.addEventListener("beforeinstallprompt", handler);
 
     // Check if installed during session
-    window.addEventListener('appinstalled', () => {
+    const handleInstalled = () => {
       setIsInstalled(true);
       setShowPrompt(false);
-    });
+    };
+
+    window.addEventListener("appinstalled", handleInstalled);
 
     return () => {
-      window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("appinstalled", handleInstalled);
     };
-  }, []);
+  }, [isInstalled]);
 
   const install = async () => {
     if (!installPrompt) return;
@@ -36,7 +40,7 @@ export function usePWAInstall() {
     const result = await installPrompt.prompt();
     console.log(`Install prompt result: ${result.outcome}`);
 
-    if (result.outcome === 'accepted') {
+    if (result.outcome === "accepted") {
       setIsInstalled(true);
     }
 

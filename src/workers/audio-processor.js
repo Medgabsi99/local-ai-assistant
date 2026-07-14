@@ -13,37 +13,40 @@ self.onmessage = async function (event) {
 
   try {
     switch (type) {
-      case 'START_RECORDING':
+      case "START_RECORDING":
         await startRecording(payload, id);
         break;
-      case 'STOP_RECORDING':
+      case "STOP_RECORDING":
         await stopRecording(id);
         break;
-      case 'PAUSE_RECORDING':
+      case "PAUSE_RECORDING":
         pauseRecording(id);
         break;
-      case 'RESUME_RECORDING':
+      case "RESUME_RECORDING":
         resumeRecording(id);
         break;
-      case 'GET_RECORDING_STATUS':
+      case "GET_RECORDING_STATUS":
         getRecordingStatus(id);
         break;
-      case 'CANCEL_RECORDING':
+      case "CANCEL_RECORDING":
         cancelRecording(id);
         break;
       default:
-        self.postMessage({ type: 'ERROR', error: `Unknown type: ${type}`, id });
+        self.postMessage({ type: "ERROR", error: `Unknown type: ${type}`, id });
     }
   } catch (error) {
     self.postMessage({
-      type: 'ERROR',
-      error: error.message || 'Audio processing error',
+      type: "ERROR",
+      error: error.message || "Audio processing error",
       id,
     });
   }
 };
 
-async function startRecording({ mimeType = 'audio/webm;codecs=opus' } = {}, id) {
+async function startRecording(
+  { mimeType = "audio/webm;codecs=opus" } = {},
+  id,
+) {
   // Reset chunks
   audioChunks = [];
 
@@ -61,17 +64,17 @@ async function startRecording({ mimeType = 'audio/webm;codecs=opus' } = {}, id) 
 
     // Check supported MIME types
     const supportedTypes = [
-      'audio/webm;codecs=opus',
-      'audio/webm',
-      'audio/ogg;codecs=opus',
-      'audio/mp4',
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/ogg;codecs=opus",
+      "audio/mp4",
     ];
 
     let selectedType = mimeType;
     if (!MediaRecorder.isTypeSupported(selectedType)) {
-      selectedType = supportedTypes.find((type) =>
-        MediaRecorder.isTypeSupported(type)
-      ) || 'audio/webm';
+      selectedType =
+        supportedTypes.find((type) => MediaRecorder.isTypeSupported(type)) ||
+        "audio/webm";
     }
 
     mediaRecorder = new MediaRecorder(stream, {
@@ -83,7 +86,7 @@ async function startRecording({ mimeType = 'audio/webm;codecs=opus' } = {}, id) 
       if (event.data.size > 0) {
         audioChunks.push(event.data);
         self.postMessage({
-          type: 'RECORDING_DATA',
+          type: "RECORDING_DATA",
           chunkSize: event.data.size,
           totalChunks: audioChunks.length,
           id,
@@ -93,8 +96,8 @@ async function startRecording({ mimeType = 'audio/webm;codecs=opus' } = {}, id) 
 
     mediaRecorder.onerror = (event) => {
       self.postMessage({
-        type: 'RECORDING_ERROR',
-        error: event.error?.message || 'Recording error',
+        type: "RECORDING_ERROR",
+        error: event.error?.message || "Recording error",
         id,
       });
     };
@@ -110,7 +113,7 @@ async function startRecording({ mimeType = 'audio/webm;codecs=opus' } = {}, id) 
       stream.getTracks().forEach((track) => track.stop());
 
       self.postMessage({
-        type: 'RECORDING_COMPLETE',
+        type: "RECORDING_COMPLETE",
         audioData,
         blob: audioBlob,
         duration: audioChunks.length * 100, // Rough estimate
@@ -123,18 +126,21 @@ async function startRecording({ mimeType = 'audio/webm;codecs=opus' } = {}, id) 
     mediaRecorder.start(1000); // Get data every second
 
     self.postMessage({
-      type: 'RECORDING_STARTED',
+      type: "RECORDING_STARTED",
       mimeType: selectedType,
       timestamp: Date.now(),
       id,
     });
   } catch (error) {
-    if (error.name === 'NotAllowedError') {
+    if (error.name === "NotAllowedError") {
       throw new Error(
-        'Microphone access denied. Please allow microphone access in your browser settings.'
+        "Microphone access denied. Please allow microphone access in your browser settings.",
+        { cause: error },
       );
-    } else if (error.name === 'NotFoundError') {
-      throw new Error('No microphone found. Please connect a microphone.');
+    } else if (error.name === "NotFoundError") {
+      throw new Error("No microphone found. Please connect a microphone.", {
+        cause: error,
+      });
     } else {
       throw error;
     }
@@ -142,11 +148,11 @@ async function startRecording({ mimeType = 'audio/webm;codecs=opus' } = {}, id) 
 }
 
 async function stopRecording(id) {
-  if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+  if (!mediaRecorder || mediaRecorder.state === "inactive") {
     self.postMessage({
-      type: 'RECORDING_STATUS',
-      status: 'inactive',
-      message: 'No active recording',
+      type: "RECORDING_STATUS",
+      status: "inactive",
+      message: "No active recording",
       id,
     });
     return;
@@ -156,11 +162,11 @@ async function stopRecording(id) {
 }
 
 function pauseRecording(id) {
-  if (!mediaRecorder || mediaRecorder.state !== 'recording') {
+  if (!mediaRecorder || mediaRecorder.state !== "recording") {
     self.postMessage({
-      type: 'RECORDING_STATUS',
-      status: mediaRecorder?.state || 'inactive',
-      message: 'Cannot pause - not recording',
+      type: "RECORDING_STATUS",
+      status: mediaRecorder?.state || "inactive",
+      message: "Cannot pause - not recording",
       id,
     });
     return;
@@ -168,18 +174,18 @@ function pauseRecording(id) {
 
   mediaRecorder.pause();
   self.postMessage({
-    type: 'RECORDING_PAUSED',
+    type: "RECORDING_PAUSED",
     timestamp: Date.now(),
     id,
   });
 }
 
 function resumeRecording(id) {
-  if (!mediaRecorder || mediaRecorder.state !== 'paused') {
+  if (!mediaRecorder || mediaRecorder.state !== "paused") {
     self.postMessage({
-      type: 'RECORDING_STATUS',
-      status: mediaRecorder?.state || 'inactive',
-      message: 'Cannot resume - not paused',
+      type: "RECORDING_STATUS",
+      status: mediaRecorder?.state || "inactive",
+      message: "Cannot resume - not paused",
       id,
     });
     return;
@@ -187,7 +193,7 @@ function resumeRecording(id) {
 
   mediaRecorder.resume();
   self.postMessage({
-    type: 'RECORDING_RESUMED',
+    type: "RECORDING_RESUMED",
     timestamp: Date.now(),
     id,
   });
@@ -195,20 +201,20 @@ function resumeRecording(id) {
 
 function getRecordingStatus(id) {
   self.postMessage({
-    type: 'RECORDING_STATUS',
-    status: mediaRecorder?.state || 'inactive',
+    type: "RECORDING_STATUS",
+    status: mediaRecorder?.state || "inactive",
     chunkCount: audioChunks.length,
     id,
   });
 }
 
 function cancelRecording(id) {
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+  if (mediaRecorder && mediaRecorder.state !== "inactive") {
     mediaRecorder.stop();
   }
   audioChunks = [];
   self.postMessage({
-    type: 'RECORDING_CANCELLED',
+    type: "RECORDING_CANCELLED",
     id,
   });
 }
@@ -240,10 +246,8 @@ async function blobToAudioData(blob) {
     // Resample using offline context
     const offlineCtx = new OfflineAudioContext(
       1,
-      Math.ceil(
-        audioBuffer.duration * targetSampleRate
-      ),
-      targetSampleRate
+      Math.ceil(audioBuffer.duration * targetSampleRate),
+      targetSampleRate,
     );
 
     const source = offlineCtx.createBufferSource();

@@ -2,8 +2,8 @@
 // Browser-Native Vector Store using OPFS
 // ============================================================
 
-const VECTOR_STORE_NAME = 'vectors';
-const METADATA_STORE_NAME = 'vector-metadata';
+const VECTOR_STORE_NAME = "vectors";
+const METADATA_STORE_NAME = "vector-metadata";
 
 class VectorStore {
   constructor() {
@@ -49,7 +49,7 @@ class VectorStore {
 
       this.initialized = true;
     } catch (error) {
-      console.error('Failed to initialize vector store:', error);
+      console.error("Failed to initialize vector store:", error);
       this.vectors = [];
       this.metadata = [];
       this.initialized = true;
@@ -76,7 +76,7 @@ class VectorStore {
       await mWritable.write(JSON.stringify(this.metadata));
       await mWritable.close();
     } catch (error) {
-      console.error('Failed to save vector store:', error);
+      console.error("Failed to save vector store:", error);
     }
   }
 
@@ -109,6 +109,31 @@ class VectorStore {
     return startIndex;
   }
 
+  async deleteVectorsByDocumentId(documentId) {
+    await this.init();
+
+    const nextVectors = [];
+    const nextMetadata = [];
+
+    for (let i = 0; i < this.metadata.length; i++) {
+      const metadata = this.metadata[i];
+
+      if (metadata?.documentId === documentId) {
+        continue;
+      }
+
+      nextVectors.push(this.vectors[i]);
+      nextMetadata.push({
+        ...metadata,
+        index: nextMetadata.length,
+      });
+    }
+
+    this.vectors = nextVectors;
+    this.metadata = nextMetadata;
+    await this.save();
+  }
+
   // Cosine similarity search
   async search(queryEmbedding, topK = 5, minSimilarity = 0.3) {
     await this.init();
@@ -136,6 +161,22 @@ class VectorStore {
     await this.save();
   }
 
+  async exportData() {
+    await this.init();
+    return {
+      vectors: this.vectors,
+      metadata: this.metadata,
+    };
+  }
+
+  async importData(payload = {}) {
+    await this.init();
+
+    this.vectors = Array.isArray(payload.vectors) ? payload.vectors : [];
+    this.metadata = Array.isArray(payload.metadata) ? payload.metadata : [];
+    await this.save();
+  }
+
   async getStats() {
     await this.init();
     return {
@@ -149,7 +190,7 @@ class VectorStore {
 // Cosine similarity between two vectors
 function cosineSimilarity(a, b) {
   if (a.length !== b.length) {
-    throw new Error('Vectors must have the same dimension');
+    throw new Error("Vectors must have the same dimension");
   }
 
   let dotProduct = 0;

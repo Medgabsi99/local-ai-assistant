@@ -83,6 +83,8 @@ function handleMessage(event) {
     'MODEL_UNLOADED',
     'ALL_MODELS_UNLOADED',
     'DOWNLOAD_CANCELLED',
+    'MODEL_SWITCHED',
+    'AVAILABLE_MODELS',
     'CANCEL_ACKNOWLEDGED',
     'DOWNLOAD_PROGRESS_ALL',
     'INFERENCE_COMPLETE',
@@ -158,6 +160,12 @@ export const ai = {
 
   getDownloadProgress: () =>
     send(getAIWorker, 'GET_DOWNLOAD_PROGRESS', {}),
+
+  switchLLMModel: (modelKey) =>
+    send(getAIWorker, 'SWITCH_LLM_MODEL', { modelKey }),
+
+  getAvailableModels: () =>
+    send(getAIWorker, 'GET_AVAILABLE_MODELS', {}),
 };
 
 // PDF Worker API
