@@ -8,19 +8,19 @@ export async function searchWeb(query) {
   try {
     const res = await fetch(
       `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1&pretty=1`,
-      { signal: AbortSignal.timeout(5000) }
+      { signal: AbortSignal.timeout(5000) },
     );
-    
+
     if (!res.ok) return null;
     const data = await res.json();
-    
+
     let results = [];
-    
+
     // Abstract text (best source)
     if (data.AbstractText) {
       results.push(data.AbstractText);
     }
-    
+
     // Related topics (secondary)
     if (data.RelatedTopics?.length) {
       for (const topic of data.RelatedTopics) {
@@ -35,7 +35,7 @@ export async function searchWeb(query) {
         if (results.length >= 8) break;
       }
     }
-    
+
     return results.length > 0 ? results.join('\n') : null;
   } catch {
     return null;

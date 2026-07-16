@@ -76,7 +76,6 @@ function handleMessage(event) {
 
   // Terminal states for all workers
   const terminalTypes = [
-    // AI Worker
     'MODEL_LOADED',
     'MODEL_STATUS',
     'ALL_MODEL_STATUSES',
@@ -88,19 +87,19 @@ function handleMessage(event) {
     'CANCEL_ACKNOWLEDGED',
     'DOWNLOAD_PROGRESS_ALL',
     'INFERENCE_COMPLETE',
+    'INFERENCE_CANCELLED',
     'EMBEDDING_RESULT',
     'EMBEDDINGS_BATCH_RESULT',
     'TRANSCRIPTION_RESULT',
-    // PDF Worker
     'EXTRACTION_COMPLETE',
     'CHUNK_COMPLETE',
-    // Audio Worker
     'RECORDING_STARTED',
     'RECORDING_COMPLETE',
     'RECORDING_PAUSED',
     'RECORDING_RESUMED',
     'RECORDING_CANCELLED',
     'RECORDING_STATUS',
+    'RECORDING_ERROR',
   ];
 
   if (terminalTypes.includes(type)) {
@@ -121,89 +120,52 @@ function send(workerGetter, type, payload, callbacks = {}) {
       onProgress: callbacks.onProgress,
       onData: callbacks.onData,
     });
-
     worker.postMessage({ type, payload, id });
   });
 }
 
-// AI Worker API
+// Send a fire-and-forget message (no response expected)
+function sendFireForget(workerGetter, type, payload) {
+  try {
+    workerGetter().postMessage({ type, payload });
+  } catch {}
+}
+
 export const ai = {
-  loadModel: (modelName, callbacks) =>
-    send(getAIWorker, 'LOAD_MODEL', { modelName }, callbacks),
-
-  cancelDownload: (modelName) =>
-    send(getAIWorker, 'CANCEL_DOWNLOAD', { modelName }),
-
-  runInference: (payload, callbacks) =>
-    send(getAIWorker, 'RUN_INFERENCE', payload, callbacks),
-
-  getEmbedding: (text, callbacks) =>
-    send(getAIWorker, 'GET_EMBEDDING', { text }, callbacks),
-
-  getEmbeddingsBatch: (texts, callbacks) =>
-    send(getAIWorker, 'GET_EMBEDDINGS_BATCH', { texts }, callbacks),
-
-  checkModel: (modelName) =>
-    send(getAIWorker, 'CHECK_MODEL', { modelName }),
-
-  checkAllModels: () =>
-    send(getAIWorker, 'CHECK_ALL_MODELS', {}),
-
-  unloadModel: (modelName) =>
-    send(getAIWorker, 'UNLOAD_MODEL', { modelName }),
-
-  unloadAll: () =>
-    send(getAIWorker, 'UNLOAD_ALL', {}),
-
-  transcribeAudio: (audioData, callbacks) =>
-    send(getAIWorker, 'TRANSCRIBE_AUDIO', { audioData }, callbacks),
-
-  getDownloadProgress: () =>
-    send(getAIWorker, 'GET_DOWNLOAD_PROGRESS', {}),
-
-  switchLLMModel: (modelKey) =>
-    send(getAIWorker, 'SWITCH_LLM_MODEL', { modelKey }),
-
-  getAvailableModels: () =>
-    send(getAIWorker, 'GET_AVAILABLE_MODELS', {}),
+  loadModel: (modelName, callbacks) => send(getAIWorker, 'LOAD_MODEL', { modelName }, callbacks),
+  cancelDownload: (modelName) => send(getAIWorker, 'CANCEL_DOWNLOAD', { modelName }),
+  cancelInference: () => sendFireForget(getAIWorker, 'CANCEL_INFERENCE', {}),
+  runInference: (payload, callbacks) => send(getAIWorker, 'RUN_INFERENCE', payload, callbacks),
+  getEmbedding: (text, callbacks) => send(getAIWorker, 'GET_EMBEDDING', { text }, callbacks),
+  getEmbeddingsBatch: (texts, callbacks) => send(getAIWorker, 'GET_EMBEDDINGS_BATCH', { texts }, callbacks),
+  checkModel: (modelName) => send(getAIWorker, 'CHECK_MODEL', { modelName }),
+  checkAllModels: () => send(getAIWorker, 'CHECK_ALL_MODELS', {}),
+  unloadModel: (modelName) => send(getAIWorker, 'UNLOAD_MODEL', { modelName }),
+  unloadAll: () => send(getAIWorker, 'UNLOAD_ALL', {}),
+  transcribeAudio: (audioData, callbacks) => send(getAIWorker, 'TRANSCRIBE_AUDIO', { audioData }, callbacks),
+  getDownloadProgress: () => send(getAIWorker, 'GET_DOWNLOAD_PROGRESS', {}),
+  switchLLMModel: (modelKey) => send(getAIWorker, 'SWITCH_LLM_MODEL', { modelKey }),
+  getAvailableModels: () => send(getAIWorker, 'GET_AVAILABLE_MODELS', {}),
 };
 
-// PDF Worker API
 export const pdf = {
   extract: (arrayBuffer, filename, callbacks) =>
     send(getPDFWorker, 'EXTRACT_PDF', { arrayBuffer, filename }, callbacks),
-
-  chunkText: (text, options, callbacks) =>
-    send(getPDFWorker, 'CHUNK_TEXT', { text, options }, callbacks),
+  chunkText: (text, options, callbacks) => send(getPDFWorker, 'CHUNK_TEXT', { text, options }, callbacks),
 };
 
-// Audio Worker API
 export const audio = {
-  startRecording: (options, callbacks) =>
-    send(getAudioWorker, 'START_RECORDING', options || {}, callbacks),
-
-  stopRecording: (callbacks) =>
-    send(getAudioWorker, 'STOP_RECORDING', {}, callbacks),
-
-  pauseRecording: () =>
-    send(getAudioWorker, 'PAUSE_RECORDING', {}),
-
-  resumeRecording: () =>
-    send(getAudioWorker, 'RESUME_RECORDING', {}),
-
-  getStatus: () =>
-    send(getAudioWorker, 'GET_RECORDING_STATUS', {}),
-
-  cancelRecording: () =>
-    send(getAudioWorker, 'CANCEL_RECORDING', {}),
+  startRecording: (options, callbacks) => send(getAudioWorker, 'START_RECORDING', options || {}, callbacks),
+  stopRecording: (callbacks) => send(getAudioWorker, 'STOP_RECORDING', {}, callbacks),
+  pauseRecording: () => send(getAudioWorker, 'PAUSE_RECORDING', {}),
+  resumeRecording: () => send(getAudioWorker, 'RESUME_RECORDING', {}),
+  getStatus: () => send(getAudioWorker, 'GET_RECORDING_STATUS', {}),
+  cancelRecording: () => send(getAudioWorker, 'CANCEL_RECORDING', {}),
 };
 
-// Cleanup
 export function terminateAll() {
   [aiWorker, pdfWorker, audioWorker].forEach((worker) => {
-    if (worker) {
-      worker.terminate();
-    }
+    if (worker) worker.terminate();
   });
   aiWorker = null;
   pdfWorker = null;

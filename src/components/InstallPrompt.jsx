@@ -7,20 +7,17 @@ export default function InstallPrompt() {
 
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 animate-slide-up">
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl p-4 
-                    flex items-center gap-4 max-w-md">
+      <div
+        className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl p-4 
+                    flex items-center gap-4 max-w-md"
+      >
         <div className="text-2xl">📲</div>
         <div className="flex-1">
           <p className="text-sm font-medium text-white">Install Local AI</p>
-          <p className="text-xs text-slate-400">
-            Use it offline like a native app
-          </p>
+          <p className="text-xs text-slate-400">Use it offline like a native app</p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={dismiss}
-            className="px-3 py-1.5 text-xs text-slate-400 hover:text-white transition-colors"
-          >
+          <button onClick={dismiss} className="px-3 py-1.5 text-xs text-slate-400 hover:text-white transition-colors">
             Later
           </button>
           <button

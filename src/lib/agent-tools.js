@@ -7,7 +7,8 @@
 function safeEval(expr) {
   try {
     // Only allow numbers, operators, parens, and basic math functions
-    const sanitized = expr.replace(/[^0-9+\-*/.()^% ,e]/g, '');
+    // Convert ^ to ** (exponentiation) since Function() treats ^ as XOR
+    const sanitized = expr.replace(/[^0-9+\-*/.()^% ,e]/g, '').replace(/\^/g, '**');
     const result = Function(`'use strict'; return (${sanitized})`)();
     return Number.isFinite(result) ? result : null;
   } catch {
@@ -28,19 +29,29 @@ function getDateTime(format = 'full') {
 function convertUnits(value, from, to) {
   const conversions = {
     // Length
-    'km-m': v => v * 1000, 'm-km': v => v / 1000,
-    'm-cm': v => v * 100, 'cm-m': v => v / 100,
-    'in-cm': v => v * 2.54, 'cm-in': v => v / 2.54,
-    'ft-m': v => v * 0.3048, 'm-ft': v => v / 0.3048,
+    'km-m': (v) => v * 1000,
+    'm-km': (v) => v / 1000,
+    'm-cm': (v) => v * 100,
+    'cm-m': (v) => v / 100,
+    'in-cm': (v) => v * 2.54,
+    'cm-in': (v) => v / 2.54,
+    'ft-m': (v) => v * 0.3048,
+    'm-ft': (v) => v / 0.3048,
     // Weight
-    'kg-g': v => v * 1000, 'g-kg': v => v / 1000,
-    'kg-lb': v => v * 2.20462, 'lb-kg': v => v / 2.20462,
+    'kg-g': (v) => v * 1000,
+    'g-kg': (v) => v / 1000,
+    'kg-lb': (v) => v * 2.20462,
+    'lb-kg': (v) => v / 2.20462,
     // Temperature
-    'c-f': v => v * 9/5 + 32, 'f-c': v => (v - 32) * 5/9,
-    'c-k': v => v + 273.15, 'k-c': v => v - 273.15,
+    'c-f': (v) => (v * 9) / 5 + 32,
+    'f-c': (v) => ((v - 32) * 5) / 9,
+    'c-k': (v) => v + 273.15,
+    'k-c': (v) => v - 273.15,
     // Volume
-    'l-ml': v => v * 1000, 'ml-l': v => v / 1000,
-    'gal-l': v => v * 3.78541, 'l-gal': v => v / 3.78541,
+    'l-ml': (v) => v * 1000,
+    'ml-l': (v) => v / 1000,
+    'gal-l': (v) => v * 3.78541,
+    'l-gal': (v) => v / 3.78541,
   };
   const key = `${from}-${to}`;
   const converter = conversions[key];
@@ -58,7 +69,8 @@ async function fetchURL(url) {
     const data = await res.json();
     const html = data.contents || '';
     // Extract text content (strip HTML tags)
-    const text = html.replace(/<[^>]*>/g, ' ')
+    const text = html
+      .replace(/<[^>]*>/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, 2000);
@@ -71,9 +83,9 @@ async function fetchURL(url) {
 // Detect if the query needs a tool, and which one
 function detectTool(query) {
   const q = query.toLowerCase();
-  
-  // Calculator
-  if (/^[\d+\-*/.()^%\s]+$/.test(query.trim())) {
+
+  // Calculator (only if expression contains at least one operator)
+  if (/^[\d+\-*/.()^%\s]+$/.test(query.trim()) && /[+\-*/^%]/.test(query)) {
     const result = safeEval(query);
     if (result !== null) return { tool: 'calculator', args: { expression: query, result } };
   }
@@ -85,51 +97,56 @@ function detectTool(query) {
       if (result !== null) return { tool: 'calculator', args: { expression: match[0].trim(), result } };
     }
   }
-  
+
   // Unit conversion
-  const unitMatch = query.match(/(\d+\.?\d*)\s*(km|m|cm|mm|kg|g|lb|l|ml|gal|c|f|k|inch|ft)\s*(?:to|in|as)\s*(km|m|cm|mm|kg|g|lb|l|ml|gal|c|f|k|inch|ft)/i);
+  const unitMatch = query.match(
+    /(\d+\.?\d*)\s*(km|m|cm|mm|kg|g|lb|l|ml|gal|c|f|k|inch|ft)\s*(?:to|in|as)\s*(km|m|cm|mm|kg|g|lb|l|ml|gal|c|f|k|inch|ft)/i,
+  );
   if (unitMatch) {
     const result = convertUnits(unitMatch[1], unitMatch[2].toLowerCase(), unitMatch[3].toLowerCase());
     if (result !== null) {
-      return { tool: 'converter', args: { value: parseFloat(unitMatch[1]), from: unitMatch[2], to: unitMatch[3], result } };
+      return {
+        tool: 'converter',
+        args: { value: parseFloat(unitMatch[1]), from: unitMatch[2], to: unitMatch[3], result },
+      };
     }
   }
-  
+
   // Date/Time
   if (/\b(current time|current date|today|what time|what date|now)\b/i.test(q)) {
     const format = q.includes('time') ? 'time' : q.includes('date') ? 'date' : 'full';
     return { tool: 'datetime', args: { format, result: getDateTime(format) } };
   }
-  
+
   // Web fetch (URL in query)
   const urlMatch = query.match(/https?:\/\/[^\s]+/);
   if (urlMatch) {
     return { tool: 'fetch', args: { url: urlMatch[0] } };
   }
-  
+
   return null;
 }
 
 // Execute a tool and return the result
 export async function executeTool(toolCall) {
   if (!toolCall) return null;
-  
+
   const { tool, args } = toolCall;
-  
+
   switch (tool) {
     case 'calculator':
       return `Calculation: ${args.expression} = ${args.result}`;
-    
+
     case 'converter':
       return `Conversion: ${args.value} ${args.from} = ${args.result} ${args.to}`;
-    
+
     case 'datetime':
       return `Current: ${args.result}`;
-    
+
     case 'fetch':
       const content = await fetchURL(args.url);
       return `Content from ${args.url}: ${content}`;
-    
+
     default:
       return null;
   }

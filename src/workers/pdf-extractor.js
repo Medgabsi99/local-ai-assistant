@@ -11,10 +11,7 @@ async function initPDFJS() {
   pdfjsLib = await import('pdfjs-dist');
 
   // Set worker path
-  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.mjs',
-    import.meta.url
-  ).toString();
+  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).toString();
 
   return pdfjsLib;
 }
@@ -93,9 +90,9 @@ async function handleExtractPDF(arrayBuffer, filename, id) {
 
 function handleChunkText(text, options = {}, id) {
   const {
-    chunkSize = 500,      // characters per chunk
-    chunkOverlap = 100,   // overlap between chunks
-    maxChunks = 100,      // safety limit
+    chunkSize = 500, // characters per chunk
+    chunkOverlap = 100, // overlap between chunks
+    maxChunks = 100, // safety limit
   } = options;
 
   const chunks = [];

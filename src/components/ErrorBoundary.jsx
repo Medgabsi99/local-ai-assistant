@@ -1,4 +1,5 @@
 import { Component } from 'react';
+import { t } from '../lib/i18n';
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -17,14 +18,19 @@ export default class ErrorBoundary extends Component {
           <div className="text-center max-w-sm">
             <div className="text-5xl mb-4">⚠️</div>
             <h2 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
-              {window.__LANG === 'fr' ? "Quelque chose s'est mal passé" : window.__LANG === 'ar' ? 'حدث خطأ ما' : 'Something went wrong'}
+              {t('settings')}
             </h2>
             <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
-              {this.state.error?.message || (window.__LANG === 'fr' ? "Une erreur inattendue s'est produite" : window.__LANG === 'ar' ? 'حدث خطأ غير متوقع' : 'An unexpected error occurred')}
+              {this.state.error?.message || t('storage')}
             </p>
-            <button onClick={() => { this.setState({ hasError: false }); window.location.reload(); }}
-              className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-medium">
-              {window.__LANG === 'fr' ? 'Recharger' : window.__LANG === 'ar' ? 'إعادة تحميل' : 'Reload'}
+            <button
+              onClick={() => {
+                this.setState({ hasError: false });
+                window.location.reload();
+              }}
+              className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-medium"
+            >
+              {t('download')}
             </button>
           </div>
         </div>

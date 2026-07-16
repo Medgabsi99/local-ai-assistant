@@ -1,9 +1,10 @@
 import { useState, useRef, useCallback } from 'react';
 import { ai } from '../workers/worker-bridge';
 import { t } from '../lib/i18n';
+import { Mic, Pause, Square, Play, X, Loader } from 'lucide-react';
 
 export default function AudioRecorder({ onTranscriptionComplete }) {
-  const [recordingState, setRecordingState] = useState('idle'); // idle | recording | paused | processing
+  const [recordingState, setRecordingState] = useState('idle');
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState(null);
   const [audioLevel, setAudioLevel] = useState(0);
@@ -25,40 +26,20 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
     chunksRef.current = [];
 
     try {
-      // getUserMedia MUST be called on the main thread — not available in Workers
       if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error(
-          'Microphone access is not available. Make sure you are on localhost or HTTPS.'
-        );
+        throw new Error('Microphone access is not available.');
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          channelCount: 1,
-          sampleRate: 16000,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
+        audio: { channelCount: 1, sampleRate: 16000, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
 
       streamRef.current = stream;
 
-      // Pick a supported MIME type
-      const supportedTypes = [
-        'audio/webm;codecs=opus',
-        'audio/webm',
-        'audio/ogg;codecs=opus',
-        'audio/mp4',
-      ];
-      const mimeType =
-        supportedTypes.find((t) => MediaRecorder.isTypeSupported(t)) ||
-        'audio/webm';
+      const supportedTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
+      const mimeType = supportedTypes.find((t) => MediaRecorder.isTypeSupported(t)) || 'audio/webm';
 
-      const recorder = new MediaRecorder(stream, {
-        mimeType,
-        audioBitsPerSecond: 64000,
-      });
+      const recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 64000 });
       mediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (e) => {
@@ -79,9 +60,9 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
       timerRef.current = setInterval(updateDuration, 1000);
     } catch (err) {
       if (err.name === 'NotAllowedError') {
-        setError('Microphone access denied. Please allow microphone access in your browser settings.');
+        setError('Microphone access denied.');
       } else if (err.name === 'NotFoundError') {
-        setError('No microphone found. Please connect a microphone.');
+        setError('No microphone found.');
       } else {
         setError(err.message);
       }
@@ -107,7 +88,6 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
             const mimeType = recorder.mimeType || 'audio/webm';
             const blob = new Blob(chunksRef.current, { type: mimeType });
 
-            // Resample to 16 kHz Float32Array (main thread — OfflineAudioContext is available here)
             const arrayBuffer = await blob.arrayBuffer();
             const audioCtx = new AudioContext({ sampleRate: 16000 });
             const decoded = await audioCtx.decodeAudioData(arrayBuffer);
@@ -117,11 +97,7 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
             if (decoded.sampleRate === 16000 && decoded.numberOfChannels === 1) {
               audioData = decoded.getChannelData(0);
             } else {
-              const offlineCtx = new OfflineAudioContext(
-                1,
-                Math.ceil(decoded.duration * 16000),
-                16000
-              );
+              const offlineCtx = new OfflineAudioContext(1, Math.ceil(decoded.duration * 16000), 16000);
               const src = offlineCtx.createBufferSource();
               src.buffer = decoded;
               src.connect(offlineCtx.destination);
@@ -130,11 +106,7 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
               audioData = resampled.getChannelData(0);
             }
 
-            // Send Float32Array to Whisper worker
-            const transcription = await ai.transcribeAudio(audioData, {
-              onProgress: (data) => console.log('Transcription progress:', data),
-            });
-
+            const transcription = await ai.transcribeAudio(audioData);
             onTranscriptionComplete?.(transcription.text);
             resolve();
           } catch (err) {
@@ -194,11 +166,11 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
       {recordingState === 'idle' && (
         <button
           onClick={startRecording}
-          className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600
-                   text-slate-200 rounded-lg transition-colors text-sm"
+          className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors text-sm"
           title={t('read_aloud')}
+          aria-label={t('read_aloud')}
         >
-          <MicIcon />
+          <Mic size={16} />
           <span>{t('upload')}</span>
         </button>
       )}
@@ -215,31 +187,16 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
 
           <div className="flex items-end gap-0.5 h-5">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div
-                key={i}
-                className="w-1 bg-red-500 rounded-t transition-all duration-100"
-                style={{
-                  height: `${Math.min(100, audioLevel * (i * 0.3))}%`,
-                  opacity: 0.3 + i * 0.15,
-                }}
-              />
+              <div key={i} className="w-1 bg-red-500 rounded-t transition-all duration-100" style={{ height: `${Math.min(100, audioLevel * (i * 0.3))}%`, opacity: 0.3 + i * 0.15 }} />
             ))}
           </div>
 
-          <button
-            onClick={pauseRecording}
-            className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors"
-            title={t('pause')}
-          >
-            <PauseIcon />
+          <button onClick={pauseRecording} className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors" title={t('pause')} aria-label={t('pause')}>
+            <Pause size={14} />
           </button>
 
-          <button
-            onClick={stopRecording}
-            className="p-1.5 bg-red-600 hover:bg-red-500 rounded text-white transition-colors"
-            title={t('stop')}
-          >
-            <StopIcon />
+          <button onClick={stopRecording} className="p-1.5 bg-red-600 hover:bg-red-500 rounded text-white transition-colors" title={t('stop')} aria-label={t('stop')}>
+            <Square size={14} />
           </button>
         </div>
       )}
@@ -248,35 +205,23 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
         <div className="flex items-center gap-2">
           <span className="text-xs text-yellow-400 font-mono">⏸ {formatTime(duration)}</span>
 
-          <button
-            onClick={resumeRecording}
-            className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors"
-            title={t('resume')}
-          >
-            <PlayIcon />
+          <button onClick={resumeRecording} className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors" title={t('resume')} aria-label={t('resume')}>
+            <Play size={14} />
           </button>
 
-          <button
-            onClick={stopRecording}
-            className="p-1.5 bg-red-600 hover:bg-red-500 rounded text-white transition-colors"
-            title={t('stop')}
-          >
-            <StopIcon />
+          <button onClick={stopRecording} className="p-1.5 bg-red-600 hover:bg-red-500 rounded text-white transition-colors" title={t('stop')} aria-label={t('stop')}>
+            <Square size={14} />
           </button>
 
-          <button
-            onClick={cancelRecording}
-            className="p-1.5 hover:bg-slate-700 rounded text-slate-500 hover:text-slate-300 transition-colors"
-            title={t('record_cancel')}
-          >
-            <XIcon />
+          <button onClick={cancelRecording} className="p-1.5 hover:bg-slate-700 rounded text-slate-500 hover:text-slate-300 transition-colors" title={t('record_cancel')} aria-label={t('record_cancel')}>
+            <X size={14} />
           </button>
         </div>
       )}
 
       {recordingState === 'processing' && (
         <div className="flex items-center gap-2 text-xs text-slate-400">
-          <span className="animate-spin">⏳</span>
+          <Loader size={14} className="animate-spin" />
           <span>{t('transcribing')}</span>
         </div>
       )}
@@ -285,54 +230,9 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
         <div className="text-xs text-red-400 flex items-center gap-1">
           <span>⚠</span>
           <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-400">✕</button>
+          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-400" aria-label="Dismiss error">✕</button>
         </div>
       )}
     </div>
-  );
-}
-
-function MicIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
-      <path d="M19 10v2a7 7 0 01-14 0v-2" />
-      <line x1="12" y1="19" x2="12" y2="23" />
-      <line x1="8" y1="23" x2="16" y2="23" />
-    </svg>
-  );
-}
-
-function PauseIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-      <rect x="6" y="4" width="4" height="16" rx="1" />
-      <rect x="14" y="4" width="4" height="16" rx="1" />
-    </svg>
-  );
-}
-
-function StopIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-      <rect x="6" y="6" width="12" height="12" rx="2" />
-    </svg>
-  );
-}
-
-function PlayIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-      <polygon points="5,3 19,12 5,21" />
-    </svg>
-  );
-}
-
-function XIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
   );
 }

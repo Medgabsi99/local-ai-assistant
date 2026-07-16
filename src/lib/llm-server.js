@@ -44,7 +44,7 @@ export async function checkServer() {
     const data = await res.json();
     return {
       available: true,
-      models: (data.models || []).map(m => m.name),
+      models: (data.models || []).map((m) => m.name),
     };
   } catch (e) {
     return { available: false, error: e.message };
@@ -76,14 +76,14 @@ export async function generate(prompt, { onToken, onDone, maxTokens = 2048, temp
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let fullText = '';
-    
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      
+
       const chunk = decoder.decode(value, { stream: true });
       const lines = chunk.split('\n').filter(Boolean);
-      
+
       for (const line of lines) {
         try {
           const data = JSON.parse(line);

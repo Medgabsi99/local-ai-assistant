@@ -7,9 +7,11 @@ export default function Layout({ children }) {
   return (
     <div className="h-screen flex flex-col bg-slate-950">
       {showOfflineBanner && (
-        <div className={`px-3 py-1 text-center text-xs font-medium flex-shrink-0 transition-colors ${
-          isOnline ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'
-        }`}>
+        <div
+          className={`px-3 py-1 text-center text-xs font-medium flex-shrink-0 transition-colors ${
+            isOnline ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'
+          }`}
+        >
           {isOnline ? '✅ Back online' : '📡 You are offline'}
         </div>
       )}

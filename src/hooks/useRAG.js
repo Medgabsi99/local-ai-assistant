@@ -1,11 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { ai, pdf } from '../workers/worker-bridge';
 import { getVectorStore } from '../workers/vector-store';
-import {
-  saveDocument,
-  saveDocumentChunks,
-  getDocumentChunks,
-} from '../db/database';
+import { saveDocument, saveDocumentChunks, getDocumentChunks } from '../db/database';
 import { hybridSearch } from '../lib/hybrid-search';
 
 export function useRAG() {
@@ -153,16 +149,24 @@ export function useRAG() {
     // Fetch more candidates (topK * 3) so re-ranking has better pool
     const matches = await store.search(queryEmbedding, topK * 3, 0.2);
 
-    // Fetch all matching chunks from IndexedDB
+    // Fetch chunks from IndexedDB, caching by documentId
     const allChunks = [];
     const seenDocChunks = new Set();
-    
+    const docChunkCache = new Map();
+
     for (const match of matches) {
       if (match.metadata.documentId && match.metadata.chunkIndex !== undefined) {
         const key = `${match.metadata.documentId}-${match.metadata.chunkIndex}`;
         if (!seenDocChunks.has(key)) {
           seenDocChunks.add(key);
-          const chunks = await getDocumentChunks(match.metadata.documentId);
+
+          // Cache chunks per document — avoids reading the same doc N times
+          let chunks = docChunkCache.get(match.metadata.documentId);
+          if (!chunks) {
+            chunks = await getDocumentChunks(match.metadata.documentId);
+            docChunkCache.set(match.metadata.documentId, chunks);
+          }
+
           const chunk = chunks.find((c) => c.chunkIndex === match.metadata.chunkIndex);
           if (chunk) {
             allChunks.push({
