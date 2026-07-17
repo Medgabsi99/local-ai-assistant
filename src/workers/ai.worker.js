@@ -337,6 +337,10 @@ async function handleInference(payload, id) {
   const config = MODEL_CONFIGS[modelName];
   if (!config?.loaded) throw new Error(`Model ${modelName} not loaded.`);
 
+  // Create abort controller for this inference run
+  inferenceAbortController = new AbortController();
+  const signal = inferenceAbortController.signal;
+
   let prompt = '';
   if (context?.length) prompt += 'Document context:\n' + context.join('\n\n') + '\n\n';
   if (webContext) prompt += 'Web search results:\n' + webContext + '\n\n';
@@ -355,6 +359,8 @@ async function handleInference(payload, id) {
         temperature,
         do_sample: temperature > 0,
         callback_function: (tokens) => {
+          // Check if cancelled between tokens
+          if (signal.aborted) throw new Error('Inference cancelled by user');
           try {
             if (tokens[0]?.length > prev) {
               const p = config.instance.tokenizer.decode(tokens[0].slice(prev), { skip_special_tokens: true });
@@ -367,6 +373,7 @@ async function handleInference(payload, id) {
           } catch {}
         },
       });
+      if (signal.aborted) { inferenceAbortController = null; return; }
       const r = Array.isArray(gen) ? gen[0] : gen;
       self.postMessage({
         type: 'INFERENCE_COMPLETE',
@@ -377,6 +384,7 @@ async function handleInference(payload, id) {
       });
     } else {
       const r = await config.instance(prompt, { max_new_tokens: maxTokens, temperature, do_sample: temperature > 0 });
+      if (signal.aborted) { inferenceAbortController = null; return; }
       const t =
         typeof r === 'string'
           ? r
@@ -392,8 +400,13 @@ async function handleInference(payload, id) {
       });
     }
   } catch (error) {
+    if (error.message === 'Inference cancelled by user') {
+      inferenceAbortController = null;
+      return;
+    }
     self.postMessage({ type: 'ERROR', error: `Inference failed: ${error.message}`, stack: error.stack, id });
   }
+  inferenceAbortController = null;
 }
 
 async function handleTranscribeAudio(audioData, id) {

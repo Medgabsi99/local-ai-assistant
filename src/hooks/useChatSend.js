@@ -36,10 +36,14 @@ export function useChatSend({
 
       try {
         let context = null;
+        let contextSources = [];
         if (useRAGMode) {
           try {
             const c = await searchSimilar(userMessage, 3);
-            if (c.length > 0) context = c.map((x) => x.content);
+            if (c.length > 0) {
+              context = c.map((x) => x.content);
+              contextSources = c.map((x) => x.documentTitle).filter(Boolean);
+            }
             setRetrievedContext(c);
           } catch (e) {
             console.warn('RAG:', e);
@@ -113,7 +117,7 @@ export function useChatSend({
           ragUsed: !!context,
           webUsed: !!webContext,
           timeMs,
-          contextSources: context ? [] : [],
+          contextSources,
         });
         setStreamingContent('');
         if (messages.length === 0) {

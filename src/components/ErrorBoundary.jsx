@@ -18,10 +18,10 @@ export default class ErrorBoundary extends Component {
           <div className="text-center max-w-sm">
             <div className="text-5xl mb-4">⚠️</div>
             <h2 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
-              {t('settings')}
+              {t('error_title')}
             </h2>
             <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
-              {this.state.error?.message || t('storage')}
+              {this.state.error?.message || t('error_body')}
             </p>
             <button
               onClick={() => {
@@ -30,7 +30,7 @@ export default class ErrorBoundary extends Component {
               }}
               className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-medium"
             >
-              {t('download')}
+              {t('reload')}
             </button>
           </div>
         </div>

@@ -4,8 +4,8 @@ import { db, exportAppData, importAppData, getConversationMessages } from '../db
 import { getVectorStore } from '../lib/vector-store-access';
 import { getServerConfig, setServerConfig, checkServer } from '../lib/llm-server';
 import { t, setLanguage, getLanguage, getLanguages } from '../lib/i18n';
-import { useLang } from '../App';
-import { BarChart3, Globe, Palette, Server, Trash2, Lock, Wifi, HardDrive, Brain } from 'lucide-react';
+import { useLang, useToast } from '../App';
+import { BarChart3, Globe, Palette, Server, Trash2, Lock, Wifi, HardDrive } from 'lucide-react';
 import VectorStoreManager from './VectorStoreManager';
 
 export default function SettingsModal({ isOpen, onClose }) {
@@ -17,6 +17,7 @@ export default function SettingsModal({ isOpen, onClose }) {
   const [serverCfg, setServerCfg] = useState(getServerConfig());
   const [srvStatus, setSrvStatus] = useState({ checking: false, result: null });
   const { switchLang } = useLang();
+  const toast = useToast();
   const [stats, setStats] = useState({ totalConversations: 0, totalMessages: 0, totalTokens: 0, totalDocuments: 0 });
 
   useEffect(() => {
@@ -76,11 +77,11 @@ export default function SettingsModal({ isOpen, onClose }) {
       const cacheKeys = await caches.keys();
       for (const key of cacheKeys) await caches.delete(key);
       await ai.unloadAll();
-      alert(t('all_data_device'));
+      toast?.('Data cleared. Reloading...', 'success');
       window.location.reload();
     } catch (error) {
       console.error(error);
-      alert('Failed: ' + error.message);
+      toast?.('Failed: ' + error.message, 'error');
     }
     setClearing(false);
   };
@@ -101,7 +102,7 @@ export default function SettingsModal({ isOpen, onClose }) {
       a.remove();
       URL.revokeObjectURL(url);
     } catch (error) {
-      alert('Export failed: ' + error.message);
+      toast?.('Export failed: ' + error.message, 'error');
     } finally {
       setTransferring(false);
     }
@@ -119,7 +120,7 @@ export default function SettingsModal({ isOpen, onClose }) {
     try {
       payload = JSON.parse(await file.text());
     } catch {
-      alert('Invalid JSON.');
+      toast?.('Invalid JSON file.', 'error');
       return;
     }
     if (!confirm('Replace all data with this backup?')) return;
@@ -131,10 +132,10 @@ export default function SettingsModal({ isOpen, onClose }) {
       await importAppData(payload);
       await store.clear();
       await store.importData(payload.vectorStore || {});
-      alert('Imported.');
+      toast?.('Data imported successfully.', 'success');
       window.location.reload();
     } catch (error) {
-      alert('Import failed: ' + error.message);
+      toast?.('Import failed: ' + error.message, 'error');
     } finally {
       setTransferring(false);
     }
@@ -159,7 +160,10 @@ export default function SettingsModal({ isOpen, onClose }) {
           <div className="space-y-6">
             {/* Stats */}
             <div>
-              <h3 className="text-sm font-medium text-slate-300 mb-3"><BarChart3 size={16} className="inline mr-1" />{t('statistics')}</h3>
+              <h3 className="text-sm font-medium text-slate-300 mb-3">
+                <BarChart3 size={16} className="inline mr-1" />
+                {t('statistics')}
+              </h3>
               <div className="grid grid-cols-2 gap-2">
                 {[
                   { label: t('conversations'), value: stats.totalConversations },
@@ -177,7 +181,10 @@ export default function SettingsModal({ isOpen, onClose }) {
 
             {/* Language */}
             <div>
-              <h3 className="text-sm font-medium text-slate-300 mb-3"><Globe size={16} className="inline mr-1" />{t('settings')}</h3>
+              <h3 className="text-sm font-medium text-slate-300 mb-3">
+                <Globe size={16} className="inline mr-1" />
+                {t('settings')}
+              </h3>
               <div className="flex gap-2">
                 {getLanguages().map((lang) => (
                   <button
@@ -199,7 +206,10 @@ export default function SettingsModal({ isOpen, onClose }) {
 
             {/* Accent */}
             <div>
-              <h3 className="text-sm font-medium text-slate-300 mb-3"><Palette size={16} className="inline mr-1" />{t('accent_color')}</h3>
+              <h3 className="text-sm font-medium text-slate-300 mb-3">
+                <Palette size={16} className="inline mr-1" />
+                {t('accent_color')}
+              </h3>
               <div className="flex gap-2">
                 {[
                   { name: 'emerald', class: 'bg-emerald-500' },
@@ -267,7 +277,8 @@ export default function SettingsModal({ isOpen, onClose }) {
                 onClick={() => setShowVectorManager(true)}
                 className="w-full px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm transition-colors text-left"
               >
-                <Trash2 size={14} className="inline mr-1" />{t('settings')}
+                <Trash2 size={14} className="inline mr-1" />
+                {t('settings')}
               </button>
               <button
                 onClick={handleClearAllData}
@@ -279,7 +290,10 @@ export default function SettingsModal({ isOpen, onClose }) {
 
               {/* LLM Server */}
               <div className="border-t border-slate-700 pt-3 mt-3">
-                <p className="text-xs font-medium text-slate-400 mb-2"><Server size={14} className="inline mr-1" />{t('llm_server')}</p>
+                <p className="text-xs font-medium text-slate-400 mb-2">
+                  <Server size={14} className="inline mr-1" />
+                  {t('llm_server')}
+                </p>
                 <input
                   type="text"
                   value={serverCfg.baseUrl}
@@ -338,19 +352,13 @@ export default function SettingsModal({ isOpen, onClose }) {
               </div>
             </div>
 
-            {/* Info */}
+            {/* Keyboard shortcuts */}
             <div className="bg-slate-900 rounded-xl p-4 text-xs text-slate-500 space-y-1">
-              <p><Lock size={12} className="inline mr-1" />{t('all_data_device')}</p>
-              <p><Wifi size={12} className="inline mr-1" />{t('all_data_device')}</p>
-              <p><HardDrive size={12} className="inline mr-1" />{t('all_data_device')}</p>
-              <p><Brain size={12} className="inline mr-1" />{t('all_data_device')}</p>
-              <div className="pt-2 border-t border-slate-700/60 mt-2 space-y-1">
-                <p className="text-slate-400 font-medium">{t('settings')}</p>
-                <p>⌘1: {t('chat')}</p>
-                <p>⌘2: {t('documents')}</p>
-                <p>⌘N: {t('new_chat')}</p>
-                <p>⌘,: {t('settings')}</p>
-              </div>
+              <p className="text-slate-400 font-medium">{t('settings')}</p>
+              <p>⌘1: {t('chat')}</p>
+              <p>⌘2: {t('documents')}</p>
+              <p>⌘N: {t('new_chat')}</p>
+              <p>⌘,: {t('settings')}</p>
             </div>
           </div>
         </div>

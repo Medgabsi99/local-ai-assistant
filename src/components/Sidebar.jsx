@@ -102,6 +102,13 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('search_conv')}
           className="w-full h-8 text-xs px-3 rounded-lg outline-none focus:border-emerald-500/50 transition-colors"
           style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+        <button onClick={() => setShowArchived(!showArchived)}
+          className={`w-full mt-1.5 text-[10px] px-2 py-1 rounded-md transition-colors ${showArchived ? 'bg-emerald-500/20 text-emerald-300' : ''}`}
+          style={{ background: showArchived ? undefined : 'var(--bg-hover)', color: showArchived ? undefined : 'var(--text-muted)' }}
+          aria-label={showArchived ? t('chat') : t('archived')}>
+          <Archive size={10} className="inline mr-1" />
+          {showArchived ? t('chat') : t('archived')} ({conversations.filter(c => c.archived).length})
+        </button>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-2 space-y-0.5">

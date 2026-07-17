@@ -31,8 +31,8 @@ function CodeBlock({ className, children }) {
     <div className="my-3 rounded-xl overflow-hidden border border-slate-700/60">
       <div className="flex items-center justify-between px-4 py-1.5 bg-slate-800 text-[11px] text-slate-500">
         <span>{lang}</span>
-        <button onClick={() => navigator.clipboard.writeText(code)} className="hover:text-slate-300 transition-colors">
-          📋
+        <button onClick={() => navigator.clipboard.writeText(code)} className="hover:text-slate-300 transition-colors" aria-label={t('copy')}>
+          <Copy size={12} />
         </button>
       </div>
       <SyntaxHighlighter
@@ -320,6 +320,7 @@ export default function ChatArea({ conversationId }) {
               disabled={searchResults.length === 0}
               className="text-xs disabled:opacity-30 px-1"
               style={{ color: 'var(--text-muted)' }}
+              aria-label="Previous match"
             >
               ▲
             </button>
@@ -328,6 +329,7 @@ export default function ChatArea({ conversationId }) {
               disabled={searchResults.length === 0}
               className="text-xs disabled:opacity-30 px-1"
               style={{ color: 'var(--text-muted)' }}
+              aria-label="Next match"
             >
               ▼
             </button>
@@ -335,6 +337,7 @@ export default function ChatArea({ conversationId }) {
               onClick={() => { setShowSearch(false); setSearchQuery(''); }}
               className="text-xs px-1"
               style={{ color: 'var(--text-muted)' }}
+              aria-label="Close search"
             >
               ✕
             </button>
@@ -447,6 +450,7 @@ export default function ChatArea({ conversationId }) {
               onClick={() => setShowTemplates(false)}
               className="text-[10px] px-2 py-1 rounded-md hover:bg-white/5"
               style={{ color: 'var(--text-muted)' }}
+              aria-label="Close"
             >
               ✕
             </button>
@@ -629,6 +633,7 @@ export default function ChatArea({ conversationId }) {
             className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5"
             style={{ color: 'var(--text-muted)' }}
             title={t('bold')}
+            aria-label={t('bold')}
           >
             <Bold size={14} />
           </button>
@@ -637,6 +642,7 @@ export default function ChatArea({ conversationId }) {
             className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5"
             style={{ color: 'var(--text-muted)' }}
             title={t('italic')}
+            aria-label={t('italic')}
           >
             <Italic size={14} />
           </button>
@@ -645,6 +651,7 @@ export default function ChatArea({ conversationId }) {
             className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5"
             style={{ color: 'var(--text-muted)' }}
             title={t('code')}
+            aria-label={t('code')}
           >
             <Code size={14} />
           </button>
@@ -653,6 +660,7 @@ export default function ChatArea({ conversationId }) {
             className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5"
             style={{ color: 'var(--text-muted)' }}
             title={t('link')}
+            aria-label={t('link')}
           >
             <Link size={14} />
           </button>
@@ -661,6 +669,7 @@ export default function ChatArea({ conversationId }) {
             className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5"
             style={{ color: 'var(--text-muted)' }}
             title={t('list')}
+            aria-label={t('list')}
           >
             <List size={14} />
           </button>
@@ -669,6 +678,7 @@ export default function ChatArea({ conversationId }) {
             className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5"
             style={{ color: 'var(--text-muted)' }}
             title={t('code_block')}
+            aria-label={t('code_block')}
           >
             <BookOpen size={14} />
           </button>
@@ -698,6 +708,7 @@ export default function ChatArea({ conversationId }) {
               <button
                 onClick={stopGeneration}
                 className="inline-flex items-center justify-center rounded-xl font-medium text-sm transition-all h-[42px] w-[42px] p-0 bg-red-500 hover:bg-red-400 text-white"
+                aria-label="Stop generation"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                   <rect x="6" y="6" width="12" height="12" rx="2" />
@@ -708,6 +719,7 @@ export default function ChatArea({ conversationId }) {
                 onClick={onSend}
                 disabled={!input.trim()}
                 className="inline-flex items-center justify-center rounded-xl font-medium text-sm transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:pointer-events-none h-[42px] w-[42px] p-0 bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg"
+                aria-label={t('send')}
               >
                 <svg
                   width="16"
@@ -733,6 +745,7 @@ export default function ChatArea({ conversationId }) {
               setShowScrollBtn(false);
             }}
             className="fixed bottom-20 right-8 z-30 w-10 h-10 flex items-center justify-center rounded-full bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/30 transition-all animate-fade-in"
+            aria-label="Scroll to bottom"
           >
             <svg
               width="16"
