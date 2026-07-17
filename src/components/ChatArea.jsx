@@ -12,15 +12,19 @@ import {
   setSetting,
   toggleMessageStar,
 } from '../db/database';
-import { ai } from '../workers/worker-bridge';
 import { t } from '../lib/i18n';
 import { Lock, Star, Volume2, Copy, Pencil, Trash2, Bold, Italic, Code, Link, List, BookOpen } from 'lucide-react';
 import { useToast } from '../App';
+import { reportError } from '../lib/error-handler';
 import { useChatSend } from '../hooks/useChatSend';
 import { useMessageSearch } from '../hooks/useMessageSearch';
+import { useModelStatus } from '../App';
+import { useSettings } from '../hooks/useSettings';
 import ChatTopBar from './ChatTopBar';
+import SearchBar from './SearchBar';
+import SystemPromptEditor from './SystemPromptEditor';
+import TemplatesPanel from './TemplatesPanel';
 import AudioRecorder from './AudioRecorder';
-import { MessageSkeleton } from './Skeleton';
 
 function CodeBlock({ className, children }) {
   const match = /language-(\w+)/.exec(className || '');
@@ -53,14 +57,12 @@ export default function ChatArea({ conversationId }) {
   const [input, setInput] = useState('');
   const [useRAGMode, setUseRAGMode] = useState(true);
   const [retrievedContext, setRetrievedContext] = useState(null);
-  const [systemPrompt, setSystemPrompt] = useState('');
   const [showSystemPrompt, setShowSystemPrompt] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [editContent, setEditContent] = useState('');
   const [userScrolledUp, setUserScrolledUp] = useState(false);
-  const [theme, setTheme] = useState('dark');
-  const [embeddingModelReady, setEmbeddingModelReady] = useState(false);
-  const [modelsLoading, setModelsLoading] = useState(true);
+  const { anyLoading: modelsLoading, embeddingModelReady } = useModelStatus();
+  const { theme, toggleTheme, systemPrompt, saveSystemPrompt } = useSettings();
   const [showTemplates, setShowTemplates] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
@@ -98,45 +100,7 @@ export default function ChatArea({ conversationId }) {
     totalMatchCount, getSnippet, searchInputRef,
   } = useMessageSearch(messages, showSearch, setShowSearch);
 
-  useEffect(() => {
-    (async () => {
-      const [themeS, promptS, accentS] = await Promise.all([
-        getSetting('theme'),
-        getSetting('systemPrompt'),
-        getSetting('accent'),
-      ]);
-      if (themeS?.value) setTheme(themeS.value);
-      if (promptS?.value) setSystemPrompt(promptS.value);
-      if (accentS?.value) document.documentElement.setAttribute('data-accent', accentS.value);
-    })();
-  }, []);
-
-  useEffect(() => {
-    let c = false;
-    const check = async () => {
-      try {
-        const r = await ai.checkAllModels();
-        if (!c) {
-          const anyLoaded = Object.values(r.statuses || {}).some((s) => s.loaded || s.loading);
-          setModelsLoading(!anyLoaded);
-          setEmbeddingModelReady(r.statuses?.embedding?.loaded || false);
-        }
-      } catch {}
-    };
-    check();
-    const i = setInterval(check, 3000);
-    return () => {
-      c = true;
-      clearInterval(i);
-    };
-  }, []);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('light', theme === 'light');
-  }, [theme]);
-  useEffect(() => {
-    loadMessages();
-  }, [loadMessages]);
+  useEffect(() => { loadMessages(); }, [loadMessages]);
   useEffect(() => {
     if (!userScrolledUp) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingContent, userScrolledUp]);
@@ -144,16 +108,7 @@ export default function ChatArea({ conversationId }) {
     if (!isGenerating) inputRef.current?.focus();
   }, [isGenerating]);
 
-  const toggleTheme = async () => {
-    const n = theme === 'dark' ? 'light' : 'dark';
-    setTheme(n);
-    await setSetting('theme', n);
-  };
-  const handleTranscription = (t) => setInput((p) => p + (p ? ' ' : '') + t);
-  const saveSystemPrompt = async (v) => {
-    setSystemPrompt(v);
-    await setSetting('systemPrompt', v);
-  };
+  const handleTranscription = (text) => setInput((prev) => prev + (prev ? ' ' : '') + text);
 
   const handleScroll = useCallback(() => {
     const el = messagesRef.current;
@@ -167,7 +122,7 @@ export default function ChatArea({ conversationId }) {
     try {
       await navigator.clipboard.writeText(content);
       toast?.(t('copy'), 'success');
-    } catch {}
+    } catch (e) { reportError(e, 'clipboard copy'); }
   };
   const startEdit = (msg) => {
     setEditingMessageId(msg.id);
@@ -219,7 +174,7 @@ export default function ChatArea({ conversationId }) {
     }, 0);
   };
 
-  const onSend = () => {
+  const handleSendMessage = () => {
     if (!input.trim() || isGenerating) return;
     const msg = input.trim();
     setInput('');
@@ -229,7 +184,7 @@ export default function ChatArea({ conversationId }) {
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      onSend();
+      handleSendMessage();
     }
   };
 
@@ -276,238 +231,28 @@ export default function ChatArea({ conversationId }) {
         setShowShareModal={setShowShareModal}
       />
 
-      {showSearch && (
-        <div className="px-4 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
-          <div className="flex items-center gap-2">
-            <input
-              ref={searchInputRef}
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setSearchIndex(0); }}
-              placeholder={t('search_messages')}
-              className="flex-1 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-emerald-500/50"
-              style={{
-                background: 'var(--bg-secondary)',
-                border: '1px solid var(--border)',
-                color: 'var(--text-primary)',
-              }}
-            />
-            {searchQuery.trim() && (
-              <span className="text-[10px] whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
-                {searchResults.length > 0
-                  ? `${searchIndex + 1}/${searchResults.length} msgs · ${totalMatchCount} matches`
-                  : '0 matches'}
-              </span>
-            )}
-            <div className="flex gap-0.5">
-              {['all', 'user', 'assistant'].map((role) => (
-                <button
-                  key={role}
-                  onClick={() => { setFilterRole(role); setSearchIndex(0); }}
-                  className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
-                    filterRole === role ? 'bg-emerald-500/20 text-emerald-300' : ''
-                  }`}
-                  style={{
-                    background: filterRole === role ? undefined : 'var(--bg-hover)',
-                    color: filterRole === role ? undefined : 'var(--text-muted)',
-                  }}
-                >
-                  {role === 'all' ? 'All' : role === 'user' ? 'User' : 'AI'}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setSearchIndex((i) => Math.max(0, i - 1))}
-              disabled={searchResults.length === 0}
-              className="text-xs disabled:opacity-30 px-1"
-              style={{ color: 'var(--text-muted)' }}
-              aria-label="Previous match"
-            >
-              ▲
-            </button>
-            <button
-              onClick={() => setSearchIndex((i) => Math.min(searchResults.length - 1, i + 1))}
-              disabled={searchResults.length === 0}
-              className="text-xs disabled:opacity-30 px-1"
-              style={{ color: 'var(--text-muted)' }}
-              aria-label="Next match"
-            >
-              ▼
-            </button>
-            <button
-              onClick={() => { setShowSearch(false); setSearchQuery(''); }}
-              className="text-xs px-1"
-              style={{ color: 'var(--text-muted)' }}
-              aria-label="Close search"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
-
-      {showSystemPrompt && (
-        <div
-          className="px-4 py-2 border-b flex-shrink-0"
-          style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-primary) 95%, transparent)' }}
-        >
-          <p className="text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>
-            {t('system_prompt_short')}
-          </p>
-          <div className="flex gap-2 mb-2">
-            <textarea
-              value={systemPrompt}
-              onChange={(e) => saveSystemPrompt(e.target.value)}
-              placeholder={t('type_placeholder')}
-              rows={2}
-              className="w-full rounded-lg px-3 py-1.5 text-xs outline-none focus:border-emerald-500/50 resize-none"
-              style={{
-                background: 'var(--bg-secondary)',
-                border: '1px solid var(--border)',
-                color: 'var(--text-primary)',
-              }}
-            />
-            <button
-              onClick={() => {
-                saveSystemPrompt('');
-                setShowSystemPrompt(false);
-              }}
-              className="text-xs px-2 py-1 rounded-md hover:bg-white/5 flex-shrink-0"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              {t('clear')}
-            </button>
-          </div>
-          <div className="flex gap-1.5 flex-wrap">
-            {[
-              { label: t('presets_concise'), value: t('concise') },
-              { label: t('presets_expert'), value: t('expert') },
-              { label: t('presets_translate'), value: t('translate_fr') },
-              { label: t('presets_step'), value: t('step_by_step') },
-            ].map((preset) => (
-              <button
-                key={preset.label}
-                onClick={() => saveSystemPrompt(preset.value)}
-                className={`text-[10px] px-2 py-1 rounded-md transition-colors ${systemPrompt === preset.value ? 'bg-emerald-500/20 text-emerald-300' : ''}`}
-                style={{
-                  background: systemPrompt === preset.value ? undefined : 'var(--bg-hover)',
-                  color: systemPrompt === preset.value ? undefined : 'var(--text-muted)',
-                }}
-              >
-                {preset.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {showTemplates && (
-        <div
-          className="px-4 py-2 border-b flex-shrink-0"
-          style={{
-            borderColor: 'var(--border)',
-            background: 'color-mix(in srgb, var(--bg-primary) 95%, transparent)',
-          }}
-        >
-          <p className="text-[10px] mb-2" style={{ color: 'var(--text-muted)' }}>
-            {t('prompt_templates')}
-          </p>
-          <div className="flex gap-1.5 flex-wrap">
-            {[
-              {
-                label: t('presets_concise'),
-                prompt: t('concise'),
-              },
-              {
-                label: t('presets_expert'),
-                prompt: t('expert'),
-              },
-              {
-                label: t('presets_translate'),
-                prompt: t('translate_fr'),
-              },
-              {
-                label: t('presets_step'),
-                prompt: t('step_by_step'),
-              },
-            ].map((tmpl) => (
-              <button
-                key={tmpl.label}
-                onClick={() => {
-                  setInput(tmpl.prompt);
-                  setShowTemplates(false);
-                  inputRef.current?.focus();
-                }}
-                className="text-[10px] px-2.5 py-1.5 rounded-md transition-colors hover:bg-white/5"
-                style={{
-                  background: 'var(--bg-hover)',
-                  color: 'var(--text-secondary)',
-                }}
-              >
-                {tmpl.label}
-              </button>
-            ))}
-            <button
-              onClick={() => setShowTemplates(false)}
-              className="text-[10px] px-2 py-1 rounded-md hover:bg-white/5"
-              style={{ color: 'var(--text-muted)' }}
-              aria-label="Close"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
+      <SearchBar
+        searchQuery={searchQuery} setSearchQuery={setSearchQuery}
+        searchIndex={searchIndex} setSearchIndex={setSearchIndex}
+        filterRole={filterRole} setFilterRole={setFilterRole}
+        searchResults={searchResults} totalMatchCount={totalMatchCount}
+        searchInputRef={searchInputRef}
+        showSearch={showSearch} setShowSearch={setShowSearch}
+      />
+      <SystemPromptEditor systemPrompt={systemPrompt} saveSystemPrompt={saveSystemPrompt}
+        showSystemPrompt={showSystemPrompt} setShowSystemPrompt={setShowSystemPrompt} />
+      <TemplatesPanel showTemplates={showTemplates} setShowTemplates={setShowTemplates}
+        setInput={setInput} inputRef={inputRef} />
 
       {showShareModal && (
-        <div
-          className="px-4 py-2 border-b flex-shrink-0"
-          style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-primary) 95%, transparent)' }}
-        >
+        <div className="px-4 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-primary) 95%, transparent)' }}>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>
-              {t('share')} (
-              {t('messages_count', { n: messages.filter((m) => m.role === 'user' || m.role === 'assistant').length })})
-            </p>
-            <button
-              onClick={() => setShowShareModal(false)}
-              className="text-xs px-2 py-0.5 rounded hover:bg-white/5"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              ✕
-            </button>
+            <p className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>{t('share')} ({t('messages_count', { n: messages.filter(m => m.role === 'user' || m.role === 'assistant').length })})</p>
+            <button onClick={() => setShowShareModal(false)} className="text-xs px-2 py-0.5 rounded hover:bg-white/5" style={{ color: 'var(--text-muted)' }}>✕</button>
           </div>
           <div className="flex gap-2">
-            <button
-              onClick={async () => {
-                await navigator.clipboard.writeText(
-                  messages.map((m) => `${m.role === 'user' ? 'User' : 'AI'}:\n${m.content}`).join('\n\n'),
-                );
-                setShowShareModal(false);
-                toast?.(t('share_copy'), 'success');
-              }}
-              className="text-[11px] px-3 py-1.5 rounded-md bg-emerald-500 hover:bg-emerald-400 text-white"
-            >
-              {t('share_copy')}
-            </button>
-            <button
-              onClick={async () => {
-                const md = messages
-                  .map((m) => `### ${m.role === 'user' ? 'User' : 'AI'}\n${m.content}`)
-                  .join('\n\n---\n\n');
-                const b = new Blob([md], { type: 'text/markdown' });
-                const u = URL.createObjectURL(b);
-                const a = document.createElement('a');
-                a.href = u;
-                a.download = `chat-${new Date().toISOString().slice(0, 10)}.md`;
-                a.click();
-                URL.revokeObjectURL(u);
-                setShowShareModal(false);
-              }}
-              className="text-[11px] px-3 py-1.5 rounded-md hover:bg-white/5"
-              style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
-            >
-              {t('share_download')}
-            </button>
+            <button onClick={async () => { await navigator.clipboard.writeText(messages.map(m => `${m.role === 'user' ? 'User' : 'AI'}:\n${m.content}`).join('\n\n')); setShowShareModal(false); toast?.(t('share_copy'), 'success'); }} className="text-[11px] px-3 py-1.5 rounded-md bg-emerald-500 hover:bg-emerald-400 text-white">{t('share_copy')}</button>
+            <button onClick={async () => { const md = messages.map(m => `### ${m.role === 'user' ? 'User' : 'AI'}\n${m.content}`).join('\n\n---\n\n'); const b = new Blob([md], { type: 'text/markdown' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `chat-${new Date().toISOString().slice(0, 10)}.md`; a.click(); URL.revokeObjectURL(u); setShowShareModal(false); }} className="text-[11px] px-3 py-1.5 rounded-md hover:bg-white/5" style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>{t('share_download')}</button>
           </div>
         </div>
       )}
@@ -716,7 +461,7 @@ export default function ChatArea({ conversationId }) {
               </button>
             ) : (
               <button
-                onClick={onSend}
+                onClick={handleSendMessage}
                 disabled={!input.trim()}
                 className="inline-flex items-center justify-center rounded-xl font-medium text-sm transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:pointer-events-none h-[42px] w-[42px] p-0 bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg"
                 aria-label={t('send')}

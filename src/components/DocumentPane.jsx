@@ -31,7 +31,7 @@ export default function DocumentPane() {
   const [error, setError] = useState(null);
 
   const loadDocuments = useCallback(async () => { const docs = await getAllDocuments(); setDocuments(docs); }, []);
-  const loadStats = useCallback(async () => { try { const stats = await getStats(); setStoreStats(stats); } catch {} }, [getStats]);
+  const loadStats = useCallback(async () => { try { const stats = await getStats(); setStoreStats(stats); } catch (e) { console.warn('Stats:', e); } }, [getStats]);
 
   useEffect(() => {
     let ignore = false;

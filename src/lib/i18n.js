@@ -345,7 +345,7 @@ let currentLang = 'en';
 try {
   const saved = localStorage.getItem('lang');
   if (saved && translations[saved]) currentLang = saved;
-} catch {}
+} catch (e) { console.warn('i18n init:', e); }
 
 export function t(key, params = {}) {
   let text = translations[currentLang]?.[key] || translations.en[key] || key;
@@ -356,9 +356,7 @@ export function t(key, params = {}) {
 export function setLanguage(lang) {
   if (translations[lang]) {
     currentLang = lang;
-    try {
-      localStorage.setItem('lang', lang);
-    } catch {}
+    try { localStorage.setItem('lang', lang); } catch (e) { console.warn('i18n save:', e); }
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.lang = lang;
   }

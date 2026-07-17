@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, useCallback } from 'react';
+import { useState, useEffect, createContext, useContext, useCallback, useRef } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
 import Sidebar from './components/Sidebar';
@@ -7,17 +7,18 @@ import DocumentPane from './components/DocumentPane';
 import SettingsModal from './components/SettingsModal';
 import { t, setLanguage, getLanguage } from './lib/i18n';
 import { MessageSquare, FileText } from 'lucide-react';
+import { ai } from './workers/worker-bridge';
+import { setToastHandler } from './lib/error-handler';
 import { createConversation } from './db/database';
 
 const LangContext = createContext();
-export function useLang() {
-  return useContext(LangContext);
-}
+export function useLang() { return useContext(LangContext); }
 
 const ToastContext = createContext();
-export function useToast() {
-  return useContext(ToastContext);
-}
+export function useToast() { return useContext(ToastContext); }
+
+const ModelStatusContext = createContext({ anyLoading: false, embeddingModelReady: false });
+export function useModelStatus() { return useContext(ModelStatusContext); }
 
 function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
@@ -26,6 +27,8 @@ function ToastProvider({ children }) {
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000);
   }, []);
+  // Initialize global error handler with toast
+  useEffect(() => { setToastHandler(addToast); }, [addToast]);
   return (
     <ToastContext.Provider value={addToast}>
       {children}
@@ -82,10 +85,23 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKey);
   }, []);
 
-  const switchLang = (newLang) => {
-    setLanguage(newLang);
-    setLang(newLang);
-  };
+  const switchLang = (newLang) => { setLanguage(newLang); setLang(newLang); };
+
+  const [modelStatus, setModelStatus] = useState({ anyLoading: false, embeddingModelReady: false });
+  useEffect(() => {
+    const check = async () => {
+      try {
+        const r = await ai.checkAllModels();
+        if (r?.statuses) {
+          const anyLoading = Object.values(r.statuses).some((s) => s.loading);
+          setModelStatus({ anyLoading, embeddingModelReady: r.statuses?.embedding?.loaded || false });
+        }
+      } catch (e) { console.warn('Model status poll:', e); }
+    };
+    check();
+    const interval = setInterval(check, 3000);
+    return () => clearInterval(interval);
+  }, []);
   const handleSelectConversation = (id) => {
     setActiveConversationId(id);
     setActiveView('chat');
@@ -100,6 +116,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <LangContext.Provider value={{ lang, switchLang }}>
+      <ModelStatusContext.Provider value={modelStatus}>
         <ToastProvider>
           <Layout>
             <button
@@ -165,8 +182,9 @@ export default function App() {
             </div>
 
             <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
-          </Layout>
-        </ToastProvider>
+        </Layout>
+      </ToastProvider>
+      </ModelStatusContext.Provider>
       </LangContext.Provider>
     </ErrorBoundary>
   );

@@ -23,7 +23,7 @@ export default function ModelStatus() {
           setAvailableModels(result.models);
           setSelectedModel(result.models[0]);
         }
-      } catch {}
+      } catch (e) { console.warn('Available models:', e); }
     })();
   }, []);
 

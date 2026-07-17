@@ -40,7 +40,7 @@ export default function SettingsModal({ isOpen, onClose }) {
           totalTokens: tokens,
           totalDocuments: s.totalDocuments || 0,
         });
-      } catch {}
+      } catch (e) { console.warn('Stats:', e); }
     })();
   }, [isOpen]);
 

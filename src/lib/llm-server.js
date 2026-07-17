@@ -22,7 +22,7 @@ try {
     const parsed = JSON.parse(saved);
     config = { ...config, ...parsed };
   }
-} catch {}
+} catch (e) { console.warn('Server config load:', e); }
 
 export function getServerConfig() {
   return { ...config };
@@ -32,7 +32,7 @@ export function setServerConfig(updates) {
   config = { ...config, ...updates };
   try {
     localStorage.setItem('llm-server-config', JSON.stringify(config));
-  } catch {}
+  } catch (e) { console.warn('Server config save:', e); }
 }
 
 export async function checkServer() {
@@ -94,7 +94,7 @@ export async function generate(prompt, { onToken, onDone, maxTokens = 2048, temp
           if (data.done) {
             onDone?.(fullText);
           }
-        } catch {}
+        } catch (e) { console.warn('Server config load:', e); }
       }
     }
     return fullText;

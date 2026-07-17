@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { t } from '../lib/i18n';
-import { ai } from '../workers/worker-bridge';
+import { useModelStatus } from '../App';
 import {
   getAllConversations,
   createConversation,
@@ -32,23 +32,11 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
   const [showArchived, setShowArchived] = useState(false);
   const [renaming, setRenaming] = useState(null);
   const [renameVal, setRenameVal] = useState('');
-  const [anyLoading, setAnyLoading] = useState(false);
+  const { anyLoading } = useModelStatus();
   const renameRef = useRef(null);
 
   const load = async () => { setConversations(await getAllConversations()); };
   useEffect(() => { load(); }, [activeConversationId]);
-
-  useEffect(() => {
-    const check = async () => {
-      try {
-        const r = await ai.checkAllModels();
-        if (r?.statuses) setAnyLoading(Object.values(r.statuses).some((s) => s.loading));
-      } catch {}
-    };
-    check();
-    const i = setInterval(check, 3000);
-    return () => clearInterval(i);
-  }, []);
 
   useEffect(() => { if (renaming) renameRef.current?.select(); }, [renaming]);
 
