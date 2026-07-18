@@ -155,8 +155,11 @@ export default function ModelStatus() {
   return (
     <div className="p-4 space-y-3">
       <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-        {t('statistics')}
+        {t('local_models')}
       </h3>
+      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+        {t('local_models_desc')}
+      </p>
 
       {error && (
         <div className="bg-red-900/50 border border-red-800 rounded-lg p-2">
@@ -166,10 +169,6 @@ export default function ModelStatus() {
           </button>
         </div>
       )}
-
-      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-        {t('all_data_device')}
-      </p>
 
       {models.map(({ key, label, icon, desc, size, required }) => {
         const state = modelStates[key];
@@ -194,7 +193,7 @@ export default function ModelStatus() {
                         className="text-[10px] px-1.5 py-0.5 rounded"
                         style={{ background: 'var(--bg-hover)', color: 'var(--text-muted)' }}
                       >
-                        {t('settings')}
+                        {t('required')}
                       </span>
                     )}
                   </div>
