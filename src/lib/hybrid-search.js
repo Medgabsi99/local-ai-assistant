@@ -3,6 +3,8 @@
 // BM25 uses corpus-wide document frequency statistics
 // ============================================================
 
+import { RAG_VECTOR_WEIGHT } from './constants';
+
 // Build a corpus index: for each term, how many documents contain it
 function buildCorpusIndex(chunks) {
   const df = {}; // document frequency: term → number of docs containing it
@@ -57,7 +59,7 @@ function normalize(values) {
 }
 
 // Hybrid search: combine BM25 + vector similarity with re-ranking
-export async function hybridSearch(query, chunks, matches, vectorWeight = 0.6) {
+export async function hybridSearch(query, chunks, matches, vectorWeight = RAG_VECTOR_WEIGHT) {
   if (!matches?.length || !chunks?.length) return matches || [];
 
   // Build corpus index from ALL chunks for real IDF

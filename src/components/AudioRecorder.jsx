@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { ai } from '../workers/worker-bridge';
 import { t } from '../lib/i18n';
 import { Mic, Pause, Square, Play, X, Loader } from 'lucide-react';
+import { AUDIO_SAMPLE_RATE, AUDIO_BITS_PER_SECOND, AUDIO_CHUNK_INTERVAL_MS } from '../lib/constants';
 
 export default function AudioRecorder({ onTranscriptionComplete }) {
   const [recordingState, setRecordingState] = useState('idle');
@@ -31,7 +32,7 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { channelCount: 1, sampleRate: 16000, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        audio: { channelCount: 1, sampleRate: AUDIO_SAMPLE_RATE, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
 
       streamRef.current = stream;
@@ -39,7 +40,7 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
       const supportedTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
       const mimeType = supportedTypes.find((t) => MediaRecorder.isTypeSupported(t)) || 'audio/webm';
 
-      const recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 64000 });
+      const recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: AUDIO_BITS_PER_SECOND });
       mediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (e) => {
@@ -54,7 +55,7 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
         setRecordingState('idle');
       };
 
-      recorder.start(1000);
+      recorder.start(AUDIO_CHUNK_INTERVAL_MS);
       setRecordingState('recording');
       startTimeRef.current = Date.now();
       timerRef.current = setInterval(updateDuration, 1000);
@@ -89,7 +90,7 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
             const blob = new Blob(chunksRef.current, { type: mimeType });
 
             const arrayBuffer = await blob.arrayBuffer();
-            const audioCtx = new AudioContext({ sampleRate: 16000 });
+      const audioCtx = new AudioContext({ sampleRate: AUDIO_SAMPLE_RATE });
             const decoded = await audioCtx.decodeAudioData(arrayBuffer);
             audioCtx.close();
 

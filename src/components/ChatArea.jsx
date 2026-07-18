@@ -15,6 +15,7 @@ import {
 import { t } from '../lib/i18n';
 import { Lock, Star, Volume2, Copy, Pencil, Trash2, Bold, Italic, Code, Link, List, BookOpen } from 'lucide-react';
 import { useToast } from '../App';
+import { SCROLL_THRESHOLD_PX } from '../lib/constants';
 import { reportError } from '../lib/error-handler';
 import { useChatSend } from '../hooks/useChatSend';
 import { useMessageSearch } from '../hooks/useMessageSearch';
@@ -24,6 +25,7 @@ import ChatTopBar from './ChatTopBar';
 import SearchBar from './SearchBar';
 import SystemPromptEditor from './SystemPromptEditor';
 import TemplatesPanel from './TemplatesPanel';
+import ShareModal from './ShareModal';
 import AudioRecorder from './AudioRecorder';
 
 function CodeBlock({ className, children }) {
@@ -113,7 +115,7 @@ export default function ChatArea({ conversationId }) {
   const handleScroll = useCallback(() => {
     const el = messagesRef.current;
     if (!el) return;
-    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < SCROLL_THRESHOLD_PX;
     setUserScrolledUp(!isAtBottom);
     setShowScrollBtn(!isAtBottom && messages.length > 0);
   }, [messages.length]);
@@ -244,18 +246,7 @@ export default function ChatArea({ conversationId }) {
       <TemplatesPanel showTemplates={showTemplates} setShowTemplates={setShowTemplates}
         setInput={setInput} inputRef={inputRef} />
 
-      {showShareModal && (
-        <div className="px-4 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-primary) 95%, transparent)' }}>
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>{t('share')} ({t('messages_count', { n: messages.filter(m => m.role === 'user' || m.role === 'assistant').length })})</p>
-            <button onClick={() => setShowShareModal(false)} className="text-xs px-2 py-0.5 rounded hover:bg-white/5" style={{ color: 'var(--text-muted)' }}>✕</button>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={async () => { await navigator.clipboard.writeText(messages.map(m => `${m.role === 'user' ? 'User' : 'AI'}:\n${m.content}`).join('\n\n')); setShowShareModal(false); toast?.(t('share_copy'), 'success'); }} className="text-[11px] px-3 py-1.5 rounded-md bg-emerald-500 hover:bg-emerald-400 text-white">{t('share_copy')}</button>
-            <button onClick={async () => { const md = messages.map(m => `### ${m.role === 'user' ? 'User' : 'AI'}\n${m.content}`).join('\n\n---\n\n'); const b = new Blob([md], { type: 'text/markdown' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `chat-${new Date().toISOString().slice(0, 10)}.md`; a.click(); URL.revokeObjectURL(u); setShowShareModal(false); }} className="text-[11px] px-3 py-1.5 rounded-md hover:bg-white/5" style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>{t('share_download')}</button>
-          </div>
-        </div>
-      )}
+      <ShareModal showShareModal={showShareModal} setShowShareModal={setShowShareModal} messages={messages} toast={toast} />
 
       <div ref={messagesRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-5 space-y-4">
         {messages.length === 0 && !isGenerating && (

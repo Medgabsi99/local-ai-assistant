@@ -5,6 +5,7 @@ import { getVectorStore } from '../lib/vector-store-access';
 import { getServerConfig, setServerConfig, checkServer } from '../lib/llm-server';
 import { t, setLanguage, getLanguage, getLanguages } from '../lib/i18n';
 import { useLang, useToast } from '../App';
+import { ACCENT_COLORS } from '../lib/constants';
 import { BarChart3, Globe, Palette, Server, Trash2, Lock, Wifi, HardDrive } from 'lucide-react';
 import VectorStoreManager from './VectorStoreManager';
 
@@ -183,7 +184,7 @@ export default function SettingsModal({ isOpen, onClose }) {
             <div>
               <h3 className="text-sm font-medium text-slate-300 mb-3">
                 <Globe size={16} className="inline mr-1" />
-                {t('settings')}
+                {t('language')}
               </h3>
               <div className="flex gap-2">
                 {getLanguages().map((lang) => (
@@ -211,24 +212,21 @@ export default function SettingsModal({ isOpen, onClose }) {
                 {t('accent_color')}
               </h3>
               <div className="flex gap-2">
-                {[
-                  { name: 'emerald', class: 'bg-emerald-500' },
-                  { name: 'blue', class: 'bg-blue-500' },
-                  { name: 'violet', class: 'bg-violet-500' },
-                  { name: 'amber', class: 'bg-amber-500' },
-                  { name: 'rose', class: 'bg-rose-500' },
-                  { name: 'cyan', class: 'bg-cyan-500' },
-                ].map((c) => (
-                  <button
-                    key={c.name}
-                    onClick={async () => {
-                      document.documentElement.setAttribute('data-accent', c.name);
-                      await setSetting('accent', c.name);
-                    }}
-                    className={`w-8 h-8 rounded-full ${c.class} transition-all duration-200 hover:scale-110 active:scale-95`}
-                    title={c.name}
-                  />
-                ))}
+                {ACCENT_COLORS.map((name) => {
+                  const colorMap = { emerald: '#10b981', blue: '#3b82f6', violet: '#8b5cf6', amber: '#f59e0b', rose: '#f43f5e', cyan: '#06b6d4' };
+                  return (
+                    <button
+                      key={name}
+                      onClick={async () => {
+                        document.documentElement.setAttribute('data-accent', name);
+                        await setSetting('accent', name);
+                      }}
+                      className="w-8 h-8 rounded-full transition-all duration-200 hover:scale-110 active:scale-95"
+                      style={{ backgroundColor: colorMap[name] }}
+                      title={name}
+                    />
+                  );
+                })}
               </div>
             </div>
 
@@ -277,8 +275,7 @@ export default function SettingsModal({ isOpen, onClose }) {
                 onClick={() => setShowVectorManager(true)}
                 className="w-full px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm transition-colors text-left"
               >
-                <Trash2 size={14} className="inline mr-1" />
-                {t('settings')}
+                {t('vectors')}
               </button>
               <button
                 onClick={handleClearAllData}

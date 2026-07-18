@@ -1,8 +1,9 @@
 // ============================================================
 // Web Search - DuckDuckGo Instant Answer API
 // Free, no API key needed. Returns short summaries (not full pages).
-// For detailed web results, use Ollama + a local search tool.
 // ============================================================
+
+import { WEB_SEARCH_TIMEOUT_MS, WEB_FETCH_MAX_CHARS } from './constants';
 
 export async function searchWeb(query) {
   try {

@@ -4,6 +4,7 @@ import { detectTool, executeTool } from '../lib/agent-tools';
 import { getServerConfig, generate } from '../lib/llm-server';
 import { ai } from '../workers/worker-bridge';
 import { addMessage, updateConversationTitle } from '../db/database';
+import { RAG_TOP_K, INFERENCE_HISTORY_LENGTH, INFERENCE_MAX_TOKENS, INFERENCE_SERVER_MAX_TOKENS, INFERENCE_TEMPERATURE, INFERENCE_SERVER_TEMPERATURE, INFERENCE_HISTORY_MAX_CHARS } from '../lib/constants';
 import { useRAG } from './useRAG';
 import { t } from '../lib/i18n';
 
@@ -39,7 +40,7 @@ export function useChatSend({
         let contextSources = [];
         if (useRAGMode) {
           try {
-            const c = await searchSimilar(userMessage, 3);
+            const c = await searchSimilar(userMessage, RAG_TOP_K);
             if (c.length > 0) {
               context = c.map((x) => x.content);
               contextSources = c.map((x) => x.documentTitle).filter(Boolean);
@@ -72,7 +73,7 @@ export function useChatSend({
           if (systemPrompt) prompt += `System: ${systemPrompt}\n\n`;
           if (context?.length) prompt += `Context:\n${context.join('\n\n')}\n\n`;
           if (webContext) prompt += `Web search results:\n${webContext}\n\n`;
-          const recent = messages.slice(-6);
+          const recent = messages.slice(-INFERENCE_HISTORY_LENGTH);
           for (const msg of recent)
             prompt += msg.role === 'user' ? `User: ${msg.content}\n` : `Assistant: ${msg.content}\n`;
           prompt += `User: ${userMessage}\nAssistant: `;
@@ -82,8 +83,8 @@ export function useChatSend({
                 fullResponse += t;
                 setStreamingContent(fullResponse);
               },
-              maxTokens: 2048,
-              temperature: 0.3,
+              maxTokens: INFERENCE_SERVER_MAX_TOKENS,
+              temperature: INFERENCE_SERVER_TEMPERATURE,
             });
           } catch (e) {
             fullResponse = `Server error: ${e.message}.`;
@@ -91,16 +92,16 @@ export function useChatSend({
         } else {
           let prompt = systemPrompt ? `Instructions: ${systemPrompt}\n\n` : '';
           let history = '';
-          const recent = messages.slice(-6);
+          const recent = messages.slice(-INFERENCE_HISTORY_LENGTH);
           for (const msg of recent) history += msg.role === 'user' ? `${msg.content}\n` : `${msg.content}\n`;
-          if (history.length > 500) history = '...\n' + history.slice(-500);
+          if (history.length > INFERENCE_HISTORY_MAX_CHARS) history = '...\n' + history.slice(-INFERENCE_HISTORY_MAX_CHARS);
           prompt += history;
           if (agentResult) prompt += `Tool result: ${agentResult}\n\n`;
           if (context?.length) prompt += `Context:\n${context.join('\n\n')}\n\n`;
           if (webContext) prompt += `Web search results:\n${webContext}\n\n`;
           prompt += `Question: ${userMessage}\nAnswer:`;
           const result = await ai.runInference(
-            { modelName: 'llm', input: prompt, maxTokens: 512, temperature: 0.3 },
+            { modelName: 'llm', input: prompt, maxTokens: INFERENCE_MAX_TOKENS, temperature: INFERENCE_TEMPERATURE },
             {
               onToken: (t) => {
                 fullResponse += t;
