@@ -1,23 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { t } from '../lib/i18n';
-import {
-  getAllDocuments,
-  getDocument,
-  deleteDocument,
-  deleteDocumentVectors,
-  updateDocument,
-} from '../db/database';
+import { getAllDocuments, getDocument, deleteDocument, deleteDocumentVectors, updateDocument } from '../db/database';
+import { DOC_PREVIEW_MAX_CHARS, TAGS_MAX_COUNT } from '../lib/constants';
 import { useRAG } from '../hooks/useRAG';
 import PdfViewer from './PdfViewer';
-import {
-  BarChart3,
-  FileText,
-  Folder,
-  Search,
-  Trash2,
-  Paperclip,
-  File,
-} from 'lucide-react';
+import { BarChart3, FileText, Folder, Search, Trash2, Paperclip, File } from 'lucide-react';
 
 export default function DocumentPane() {
   const [documents, setDocuments] = useState([]);
@@ -90,20 +77,20 @@ export default function DocumentPane() {
       <div className="w-full md:w-80 border-r border-slate-700 flex flex-col md:max-h-full max-h-[40vh]">
         <div className="p-4 border-b border-slate-700" onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('bg-emerald-500/5'); }} onDragLeave={(e) => { e.currentTarget.classList.remove('bg-emerald-500/5'); }} onDrop={(e) => { e.preventDefault(); e.currentTarget.classList.remove('bg-emerald-500/5'); const file = e.dataTransfer.files[0]; if (file) { const input = document.querySelector('input[type="file"]'); if (input) { const dt = new DataTransfer(); dt.items.add(file); input.files = dt.files; input.dispatchEvent(new Event('change', { bubbles: true })); } } }}>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{t('documents')}</h2>
+            <h2 style={{ color: 'var(--text-primary)' }} className="text-lg font-semibold">{t('documents')}</h2>
             <label className={`px-3 py-1.5 text-white text-sm rounded-lg cursor-pointer transition-colors ${isProcessing ? 'bg-slate-600 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
               {isProcessing ? t('processing') : '+ ' + t('upload')}
               <input type="file" accept=".pdf,.txt,.md,.csv" onChange={handleFileUpload} className="hidden" disabled={isProcessing} />
             </label>
           </div>
-          <p className="text-[10px] text-center mt-1" style={{ color: 'var(--text-muted)' }}>{t('upload')}</p>
+          <p style={{ color: 'var(--text-muted)' }} className="text-[10px] text-center mt-1">{t('upload')}</p>
           <label className="block mb-3">
             <span className="sr-only">{t('search')}</span>
-            <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder={t('search_conv')} className="w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} />
+            <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder={t('search_conv')} style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border)', color: 'var(--text-primary)' }} className="w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30" />
           </label>
           {isProcessing && (
-            <div className="rounded-lg p-3 mb-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-              <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>{progress.message}</p>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }} className="rounded-lg p-3 mb-3">
+              <p style={{ color: 'var(--text-secondary)' }} className="text-xs mb-1">{progress.message}</p>
               <div className="w-full rounded-full h-1.5" style={{ background: 'var(--bg-tertiary)' }}>
                 <div className="bg-emerald-500 h-1.5 rounded-full transition-all duration-300" style={{ width: `${progress.progress}%` }} />
               </div>
@@ -116,28 +103,28 @@ export default function DocumentPane() {
             </div>
           )}
           {storeStats && storeStats.totalVectors > 0 && (
-            <div className="text-xs" style={{ color: 'var(--text-muted)' }}><p><BarChart3 size={12} className="inline mr-1" />{storeStats.totalVectors} {t('vectors')}</p><p><Folder size={12} className="inline mr-1" />{storeStats.totalDocuments} {t('documents')}</p></div>
+            <div style={{ color: 'var(--text-muted)' }} className="text-xs"><p><BarChart3 size={12} className="inline mr-1" />{storeStats.totalVectors} {t('vectors')}</p><p><Folder size={12} className="inline mr-1" />{storeStats.totalDocuments} {t('documents')}</p></div>
           )}
-          {documents.length > 0 && searchQuery.trim() && <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>{storeStats?.totalDocuments} {t('documents')}</p>}
+          {documents.length > 0 && searchQuery.trim() && <p style={{ color: 'var(--text-muted)' }} className="mt-2 text-xs">{storeStats?.totalDocuments} {t('documents')}</p>}
         </div>
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {documents.length === 0 && !isProcessing && (
             <div className="text-center py-12">
               <Folder size={40} className="mx-auto mb-3" style={{ color: 'var(--text-muted)' }} />
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('no_documents')}</p>
-              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{t('upload')} PDF, TXT, MD, CSV</p>
+              <p style={{ color: 'var(--text-secondary)' }} className="text-sm">{t('no_documents')}</p>
+              <p style={{ color: 'var(--text-muted)' }} className="text-xs mt-1">{t('upload')} PDF, TXT, MD, CSV</p>
             </div>
           )}
           {filteredDocuments.map((doc) => (
-            <div key={doc.id} onClick={() => handleViewDocument(doc.id)} className={`rounded-lg p-3 cursor-pointer transition-colors hover:bg-slate-750 ${selectedDoc === doc.id ? 'ring-2 ring-emerald-500' : ''}`} style={{ background: 'var(--bg-card)' }}>
+            <div key={doc.id} onClick={() => handleViewDocument(doc.id)} style={{ background: 'var(--bg-card)' }} className={`rounded-lg p-3 cursor-pointer transition-colors hover:bg-slate-750 ${selectedDoc === doc.id ? 'ring-2 ring-emerald-500' : ''}`}>
               <div className="flex items-center gap-3">
-                <span className="text-xl" style={{ color: 'var(--text-muted)' }}>{getFileIcon(doc.fileType)}</span>
+                <span style={{ color: 'var(--text-muted)' }} className="text-xl">{getFileIcon(doc.fileType)}</span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{doc.title}</p>
-                  {(doc.tags || []).length > 0 && <div className="mt-1 flex flex-wrap gap-1">{doc.tags.slice(0, 3).map((tag) => <span key={tag} className="rounded-full px-2 py-0.5 text-[11px]" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>#{tag}</span>)}</div>}
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{new Date(doc.createdAt).toLocaleDateString()} · {(doc.content?.length / 1000).toFixed(1)} KB</p>
+                  <p style={{ color: 'var(--text-primary)' }} className="text-sm font-medium truncate">{doc.title}</p>
+                  {(doc.tags || []).length > 0 && <div className="mt-1 flex flex-wrap gap-1">{doc.tags.slice(0, 3).map((tag) => <span key={tag} style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }} className="rounded-full px-2 py-0.5 text-[11px]">#{tag}</span>)}</div>}
+                  <p style={{ color: 'var(--text-muted)' }} className="text-xs">{new Date(doc.createdAt).toLocaleDateString()} · {(doc.content?.length / 1000).toFixed(1)} KB</p>
                 </div>
-                <button onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }} className="p-1 rounded opacity-0 group-hover:opacity-100 transition-colors" style={{ color: 'var(--text-muted)' }}><Trash2 size={14} /></button>
+                <button onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }} style={{ color: 'var(--text-muted)' }} className="p-1 rounded hover:text-red-400 transition-colors" title={t('del')}><Trash2 size={14} /></button>
               </div>
             </div>
           ))}
@@ -147,33 +134,33 @@ export default function DocumentPane() {
         {selectedDoc && docContent ? (
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>{selectedDocument?.title || t('documents')}</h3>
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{(docContent.length / 1000).toFixed(1)} KB · {docContent.split(/\s+/).length} words</span>
+              <h3 style={{ color: 'var(--text-primary)' }} className="text-lg font-medium">{selectedDocument?.title || t('documents')}</h3>
+              <span style={{ color: 'var(--text-muted)' }} className="text-xs">{(docContent.length / 1000).toFixed(1)} KB · {docContent.split(/\s+/).length} words</span>
             </div>
-            <div className="mb-4 rounded-xl p-4" style={{ border: '1px solid var(--border)', background: 'var(--bg-secondary)' }}>
-              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{t('tags')}</p>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('separate_with')}</p>
+            <div style={{ border: '1px solid var(--border)', background: 'var(--bg-secondary)' }} className="mb-4 rounded-xl p-4">
+              <p style={{ color: 'var(--text-primary)' }} className="text-sm font-medium">{t('tags')}</p>
+              <p style={{ color: 'var(--text-muted)' }} className="text-xs">{t('separate_with')}</p>
               <div className="flex gap-2 mt-2">
-                <textarea value={tagInput} onChange={(e) => setTagInput(e.target.value)} placeholder={t('tags_placeholder')} rows={2} className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500" style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+                <textarea value={tagInput} onChange={(e) => setTagInput(e.target.value)} placeholder={t('tags_placeholder')} rows={2} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} className="w-full rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500" />
                 <button onClick={handleSaveTags} className="rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-2 text-xs font-medium text-white">{t('save')}</button>
               </div>
-              {(selectedDocument?.tags || []).length > 0 && <div className="mt-3 flex flex-wrap gap-1">{selectedDocument.tags.map((tag) => <span key={tag} className="rounded-full px-2 py-0.5 text-xs" style={{ background: 'var(--accent-light)', color: 'var(--accent)' }}>#{tag}</span>)}</div>}
+              {(selectedDocument?.tags || []).length > 0 && <div className="mt-3 flex flex-wrap gap-1">{selectedDocument.tags.map((tag) => <span key={tag} style={{ background: 'var(--accent-light)', color: 'var(--accent)' }} className="rounded-full px-2 py-0.5 text-xs">#{tag}</span>)}</div>}
             </div>
             {selectedDocument?.fileType === 'application/pdf' ? (
-              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)', height: '70vh' }}>
+              <div style={{ border: '1px solid var(--border)', height: '70vh' }} className="rounded-xl overflow-hidden">
                 <PdfViewer docContent={docContent} />
               </div>
             ) : (
-              <div className="rounded-xl p-6" style={{ background: 'var(--bg-card)' }}>
-                <pre className="text-sm whitespace-pre-wrap font-sans leading-relaxed" style={{ color: 'var(--text-primary)' }}>{docContent.slice(0, 10000)}</pre>
-                {docContent.length > 10000 && <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>... (showing first 10,000 characters)</p>}
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', maxHeight: 'calc(100vh - 16rem)' }} className="rounded-xl overflow-y-auto">
+                <pre style={{ color: 'var(--text-primary)' }} className="text-sm whitespace-pre-wrap font-sans leading-relaxed p-6">{docContent.slice(0, DOC_PREVIEW_MAX_CHARS)}</pre>
+                {docContent.length > DOC_PREVIEW_MAX_CHARS && <p style={{ color: 'var(--text-muted)' }} className="text-xs px-6 pb-6">... (showing first {DOC_PREVIEW_MAX_CHARS.toLocaleString()} characters)</p>}
               </div>
             )}
           </div>
         ) : (
           <div className="flex items-center justify-center h-full">
             <FileText size={40} style={{ color: 'var(--text-muted)' }} />
-            <p className="text-sm ml-3" style={{ color: 'var(--text-muted)' }}>{t('no_documents')}</p>
+            <p style={{ color: 'var(--text-muted)' }} className="text-sm ml-3">{t('no_documents')}</p>
           </div>
         )}
       </div>
@@ -181,4 +168,4 @@ export default function DocumentPane() {
   );
 }
 
-function parseTags(value) { return [...new Set(value.split(',').map((tag) => tag.trim()).filter(Boolean))].slice(0, 20); }
+function parseTags(value) { return [...new Set(value.split(',').map((tag) => tag.trim()).filter(Boolean))].slice(0, TAGS_MAX_COUNT); }
