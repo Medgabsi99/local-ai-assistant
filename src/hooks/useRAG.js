@@ -1,13 +1,14 @@
-import { useState, useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ai, pdf } from '../workers/worker-bridge';
 import { getVectorStore } from '../workers/vector-store';
-import { saveDocument, saveDocumentChunks, getDocumentChunks } from '../db/database';
-import { CHUNK_SIZE, CHUNK_OVERLAP, RAG_FETCH_MULTIPLIER } from '../lib/constants';
+import { getDocumentChunks, saveDocument, saveDocumentChunks } from '../db/database';
+import { CHUNK_OVERLAP, CHUNK_SIZE, RAG_FETCH_MULTIPLIER } from '../lib/constants';
 import { hybridSearch } from '../lib/hybrid-search';
 
 export function useRAG() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState({ status: '', message: '', progress: 0 });
+  const [capturedImage, setCapturedImage] = useState(null); // { dataUrl, file }
   const vectorStoreRef = useRef(null);
 
   const getStore = async () => {
@@ -31,17 +32,25 @@ export function useRAG() {
       const chunkResult = await pdf.chunkText(fullText, { chunkSize: CHUNK_SIZE, chunkOverlap: CHUNK_OVERLAP });
       await saveDocumentChunks(docId, chunkResult.chunks);
       setProgress({ status: 'embedding', message: `Embedding ${chunkResult.chunks.length} chunks...`, progress: 92 });
-      const embeddingResult = await ai.getEmbeddingsBatch(chunkResult.chunks, { onProgress: (data) => setProgress(data) });
+      const embeddingResult = await ai.getEmbeddingsBatch(chunkResult.chunks, {
+        onProgress: (data) => setProgress(data),
+      });
       setProgress({ status: 'indexing', message: 'Indexing vectors...', progress: 98 });
       const store = await getStore();
-      const metadatas = chunkResult.chunks.map((_, i) => ({ documentId: docId, documentTitle: file.name, chunkIndex: i }));
+      const metadatas = chunkResult.chunks.map((_, i) => ({
+        documentId: docId,
+        documentTitle: file.name,
+        chunkIndex: i,
+      }));
       await store.addVectors(embeddingResult.embeddings, metadatas);
       setProgress({ status: 'complete', message: 'Document processed!', progress: 100 });
       return { docId, totalChunks: chunkResult.chunks.length, totalPages: extractionResult.totalPages };
     } catch (error) {
       setProgress({ status: 'error', message: error.message, progress: 0 });
       throw error;
-    } finally { setIsProcessing(false); }
+    } finally {
+      setIsProcessing(false);
+    }
   }, []);
 
   const processText = useCallback(async (content, title, fileType) => {
@@ -53,7 +62,9 @@ export function useRAG() {
       const chunkResult = await pdf.chunkText(content, { chunkSize: CHUNK_SIZE, chunkOverlap: CHUNK_OVERLAP });
       await saveDocumentChunks(docId, chunkResult.chunks);
       setProgress({ status: 'embedding', message: `Embedding ${chunkResult.chunks.length} chunks...`, progress: 60 });
-      const embeddingResult = await ai.getEmbeddingsBatch(chunkResult.chunks, { onProgress: (data) => setProgress(data) });
+      const embeddingResult = await ai.getEmbeddingsBatch(chunkResult.chunks, {
+        onProgress: (data) => setProgress(data),
+      });
       setProgress({ status: 'indexing', message: 'Indexing vectors...', progress: 90 });
       const store = await getStore();
       const metadatas = chunkResult.chunks.map((_, i) => ({ documentId: docId, documentTitle: title, chunkIndex: i }));
@@ -63,7 +74,9 @@ export function useRAG() {
     } catch (error) {
       setProgress({ status: 'error', message: error.message, progress: 0 });
       throw error;
-    } finally { setIsProcessing(false); }
+    } finally {
+      setIsProcessing(false);
+    }
   }, []);
 
   const searchSimilar = useCallback(async (query, topK = 3) => {
@@ -82,19 +95,83 @@ export function useRAG() {
         if (!seenDocChunks.has(key)) {
           seenDocChunks.add(key);
           let chunks = docChunkCache.get(match.metadata.documentId);
-          if (!chunks) { chunks = await getDocumentChunks(match.metadata.documentId); docChunkCache.set(match.metadata.documentId, chunks); }
+          if (!chunks) {
+            chunks = await getDocumentChunks(match.metadata.documentId);
+            docChunkCache.set(match.metadata.documentId, chunks);
+          }
           const chunk = chunks.find((c) => c.chunkIndex === match.metadata.chunkIndex);
-          if (chunk) allChunks.push({ content: chunk.content, metadata: { documentId: match.metadata.documentId, documentTitle: match.metadata.documentTitle, chunkIndex: match.metadata.chunkIndex }, similarity: match.similarity });
+          if (chunk)
+            allChunks.push({
+              content: chunk.content,
+              metadata: {
+                documentId: match.metadata.documentId,
+                documentTitle: match.metadata.documentTitle,
+                chunkIndex: match.metadata.chunkIndex,
+              },
+              similarity: match.similarity,
+            });
         }
       }
     }
 
     const reRanked = await hybridSearch(query, allChunks, allChunks, 0.6);
-    return reRanked.slice(0, topK).map((match) => ({ content: match.content, documentTitle: match.metadata?.documentTitle || '', similarity: match.similarity || 0, bm25Score: match.bm25Score || 0, vectorScore: match.vectorScore || 0 }));
+    return reRanked
+      .slice(0, topK)
+      .map((match) => ({
+        content: match.content,
+        documentTitle: match.metadata?.documentTitle || '',
+        similarity: match.similarity || 0,
+        bm25Score: match.bm25Score || 0,
+        vectorScore: match.vectorScore || 0,
+      }));
   }, []);
 
-  const getStats = useCallback(async () => { const store = await getStore(); return store.getStats(); }, []);
-  const clearVectors = useCallback(async () => { const store = await getStore(); await store.clear(); }, []);
+  const captureImage = useCallback(async (file) => {
+    // Read file as base64 data URL — transformers.js can fetch data URLs in workers
+    const dataUrl = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.readAsDataURL(file);
+    });
+    setCapturedImage({ dataUrl, file, name: file.name });
 
-  return { processPDF, processText, searchSimilar, getStats, clearVectors, isProcessing, progress };
+    // Pass the data URL string — the worker pipeline can fetch it natively
+    try {
+      setProgress({ status: 'analyzing', message: 'Analyzing image...', progress: 20 });
+      const result = await ai.captionImage(dataUrl);
+      if (result?.caption) {
+        setProgress({ status: 'complete', message: `Image: ${result.caption}`, progress: 100 });
+        return { caption: result.caption, dataUrl };
+      }
+    } catch (e) {
+      console.warn('Image caption failed:', e.message);
+    }
+    return { dataUrl };
+  }, []);
+
+  const clearCapturedImage = useCallback(() => {
+    setCapturedImage(null);
+  }, []);
+
+  const getStats = useCallback(async () => {
+    const store = await getStore();
+    return store.getStats();
+  }, []);
+  const clearVectors = useCallback(async () => {
+    const store = await getStore();
+    await store.clear();
+  }, []);
+
+  return {
+    processPDF,
+    processText,
+    searchSimilar,
+    captureImage,
+    clearCapturedImage,
+    capturedImage,
+    getStats,
+    clearVectors,
+    isProcessing,
+    progress,
+  };
 }
