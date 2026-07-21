@@ -4,6 +4,7 @@
 // ============================================================
 
 import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
 test.describe('App Shell', () => {
   test.beforeEach(async ({ page }) => {
@@ -81,5 +82,25 @@ test.describe('Keyboard Shortcuts', () => {
     await page.waitForTimeout(500);
     // Should show chat tab as active
     await expect(page.getByRole('tab', { name: /Chat/i })).toBeVisible();
+  });
+});
+
+test.describe('Accessibility', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('http://localhost:5173');
+  });
+
+  test('app shell should have no critical or serious accessibility violations', async ({ page }) => {
+    const results = await new AxeBuilder({ page }).analyze();
+    const violations = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
+    expect(violations.length).toBe(0);
+  });
+
+  test('settings modal should have no critical or serious accessibility violations', async ({ page }) => {
+    await page.getByLabel('Settings').first().click();
+    await page.waitForTimeout(500);
+    const results = await new AxeBuilder({ page }).analyze();
+    const violations = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
+    expect(violations.length).toBe(0);
   });
 });
