@@ -1,12 +1,12 @@
 import { useRef, useState, useEffect } from 'react';
 import { ai } from '../workers/worker-bridge';
-import { db, exportAppData, importAppData, getConversationMessages } from '../db/database';
-import { getVectorStore } from '../lib/vector-store-access';
+import { db, exportAppData, importAppData, getConversationMessages, setSetting } from '../db/database';
+import { getVectorStore, resetVectorStore } from '../lib/vector-store-access';
 import { getServerConfig, setServerConfig, checkServer } from '../lib/llm-server';
-import { t, setLanguage, getLanguage, getLanguages } from '../lib/i18n';
-import { useLang, useToast } from '../App';
+import { t, getLanguage, getLanguages } from '../lib/i18n';
+import { useLang, useToast } from '../contexts';
 import { ACCENT_COLORS } from '../lib/constants';
-import { BarChart3, Globe, Palette, Server, Trash2, Lock, Wifi, HardDrive } from 'lucide-react';
+import { BarChart3, Globe, Palette, Server } from 'lucide-react';
 import VectorStoreManager from './VectorStoreManager';
 
 export default function SettingsModal({ isOpen, onClose }) {
@@ -41,7 +41,9 @@ export default function SettingsModal({ isOpen, onClose }) {
           totalTokens: tokens,
           totalDocuments: s.totalDocuments || 0,
         });
-      } catch (e) { console.warn('Stats:', e); }
+      } catch (e) {
+        console.warn('Stats:', e);
+      }
     })();
   }, [isOpen]);
 
@@ -55,7 +57,9 @@ export default function SettingsModal({ isOpen, onClose }) {
           percentUsed: estimate.quota ? Math.round((estimate.usage / estimate.quota) * 100) : 0,
         });
       }
-    } catch {}
+    } catch {
+      /* storage estimate not available */
+    }
   };
 
   useEffect(() => {
@@ -71,20 +75,31 @@ export default function SettingsModal({ isOpen, onClose }) {
     if (!confirm(t('clear_all_confirm'))) return;
     setClearing(true);
     try {
-      await db.delete();
-      await db.open();
-      const store = await getVectorStore();
-      await store.clear();
+      // Terminate all workers first to release IndexedDB connections
+      const { terminateAll } = await import('../workers/worker-bridge');
+      terminateAll();
+      // Reset vector store promise so it re-creates on next access
+      resetVectorStore();
+      // Close the main dexie connection
+      await db.close();
+      // Delete known IndexedDB databases by name
+      const knownDatabases = ['LocalAIDB', 'LocalAIVectors', 'LocalAIMemory'];
+      for (const name of knownDatabases) {
+        indexedDB.deleteDatabase(name);
+      }
+      // Clear service worker caches
       const cacheKeys = await caches.keys();
       for (const key of cacheKeys) await caches.delete(key);
+      // Unload AI models
       await ai.unloadAll();
-      toast?.('Data cleared. Reloading...', 'success');
+      toast?.(t('data_cleared'), 'success');
+      // Force reload — this creates fresh DBs from scratch
       window.location.reload();
     } catch (error) {
       console.error(error);
-      toast?.('Failed: ' + error.message, 'error');
+      toast?.(t('failed', { message: error.message }), 'error');
+      setClearing(false);
     }
-    setClearing(false);
   };
 
   const handleExportData = async () => {
@@ -103,7 +118,7 @@ export default function SettingsModal({ isOpen, onClose }) {
       a.remove();
       URL.revokeObjectURL(url);
     } catch (error) {
-      toast?.('Export failed: ' + error.message, 'error');
+      toast?.(t('export_failed', { message: error.message }), 'error');
     } finally {
       setTransferring(false);
     }
@@ -121,10 +136,10 @@ export default function SettingsModal({ isOpen, onClose }) {
     try {
       payload = JSON.parse(await file.text());
     } catch {
-      toast?.('Invalid JSON file.', 'error');
+      toast?.(t('invalid_json'), 'error');
       return;
     }
-    if (!confirm('Replace all data with this backup?')) return;
+    if (!confirm(t('replace_all_data'))) return;
     setTransferring(true);
     try {
       const store = await getVectorStore();
@@ -133,20 +148,34 @@ export default function SettingsModal({ isOpen, onClose }) {
       await importAppData(payload);
       await store.clear();
       await store.importData(payload.vectorStore || {});
-      toast?.('Data imported successfully.', 'success');
+      toast?.(t('data_imported'), 'success');
       window.location.reload();
     } catch (error) {
-      toast?.('Import failed: ' + error.message, 'error');
+      toast?.(t('import_failed', { message: error.message }), 'error');
     } finally {
       setTransferring(false);
     }
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('settings')}
+      >
         <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md max-h-[80vh] overflow-y-auto p-6 shadow-2xl">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-white">{t('settings')}</h2>
@@ -213,7 +242,14 @@ export default function SettingsModal({ isOpen, onClose }) {
               </h3>
               <div className="flex gap-2">
                 {ACCENT_COLORS.map((name) => {
-                  const colorMap = { emerald: '#10b981', blue: '#3b82f6', violet: '#8b5cf6', amber: '#f59e0b', rose: '#f43f5e', cyan: '#06b6d4' };
+                  const colorMap = {
+                    emerald: '#10b981',
+                    blue: '#3b82f6',
+                    violet: '#8b5cf6',
+                    amber: '#f59e0b',
+                    rose: '#f43f5e',
+                    cyan: '#06b6d4',
+                  };
                   return (
                     <button
                       key={name}

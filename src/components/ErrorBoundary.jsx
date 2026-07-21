@@ -14,15 +14,11 @@ export default class ErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="h-full flex items-center justify-center p-8" className="bg-bg-primary">
+        <div className="h-full flex items-center justify-center p-8">
           <div className="text-center max-w-sm">
             <div className="text-5xl mb-4">⚠️</div>
-            <h2 className="text-lg font-bold mb-2" className="text-text-primary">
-              {t('error_title')}
-            </h2>
-            <p className="text-sm mb-4" className="text-text-muted">
-              {this.state.error?.message || t('error_body')}
-            </p>
+            <h2 className="text-lg font-bold mb-2">{t('error_title')}</h2>
+            <p className="text-sm mb-4">{this.state.error?.message || t('error_body')}</p>
             <button
               onClick={() => {
                 this.setState({ hasError: false });

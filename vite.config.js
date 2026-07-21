@@ -2,11 +2,13 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import tailwindcss from '@tailwindcss/vite';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    visualizer({ open: false, gzipSize: true, brotliSize: true, filename: 'dist/stats.html' }),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon-192.png', 'icon-512.png', 'offline.html'],
@@ -52,5 +54,6 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test-setup.js'],
     css: true,
+    exclude: ['e2e/**', 'node_modules/**'],
   },
 });

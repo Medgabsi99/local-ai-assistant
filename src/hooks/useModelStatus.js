@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ai } from '../workers/worker-bridge';
 
 export function useModelStatus() {
@@ -15,11 +15,16 @@ export function useModelStatus() {
           setModelsLoading(!anyLoaded);
           setEmbeddingModelReady(r.statuses?.embedding?.loaded || false);
         }
-      } catch {}
+      } catch {
+        /* model status check failed silently */
+      }
     };
     check();
     const interval = setInterval(check, 3000);
-    return () => { cancelled = true; clearInterval(interval); };
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   return { modelsLoading, embeddingModelReady };
