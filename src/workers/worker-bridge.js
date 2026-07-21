@@ -5,6 +5,7 @@
 let aiWorker = null;
 let pdfWorker = null;
 let audioWorker = null;
+let codeRunnerWorker = null;
 let pendingRequests = new Map();
 let requestId = 0;
 
@@ -90,6 +91,8 @@ function handleMessage(event) {
     'INFERENCE_CANCELLED',
     'EMBEDDING_RESULT',
     'EMBEDDINGS_BATCH_RESULT',
+    'SPEECH_RESULT',
+    'CAPTION_RESULT',
     'TRANSCRIPTION_RESULT',
     'EXTRACTION_COMPLETE',
     'CHUNK_COMPLETE',
@@ -100,6 +103,8 @@ function handleMessage(event) {
     'RECORDING_CANCELLED',
     'RECORDING_STATUS',
     'RECORDING_ERROR',
+    'CODE_RESULT',
+    'CONSOLE',
   ];
 
   if (terminalTypes.includes(type)) {
@@ -128,7 +133,9 @@ function send(workerGetter, type, payload, callbacks = {}) {
 function sendFireForget(workerGetter, type, payload) {
   try {
     workerGetter().postMessage({ type, payload });
-  } catch {}
+  } catch {
+    /* fire-and-forget, ignore errors */
+  }
 }
 
 export const ai = {
@@ -143,9 +150,36 @@ export const ai = {
   unloadModel: (modelName) => send(getAIWorker, 'UNLOAD_MODEL', { modelName }),
   unloadAll: () => send(getAIWorker, 'UNLOAD_ALL', {}),
   transcribeAudio: (audioData, callbacks) => send(getAIWorker, 'TRANSCRIBE_AUDIO', { audioData }, callbacks),
+  synthesizeSpeech: (text) => send(getAIWorker, 'SYNTHESIZE_SPEECH', { text }),
+  captionImage: (imageData) => send(getAIWorker, 'CAPTION_IMAGE', { imageData }),
   getDownloadProgress: () => send(getAIWorker, 'GET_DOWNLOAD_PROGRESS', {}),
   switchLLMModel: (modelKey) => send(getAIWorker, 'SWITCH_LLM_MODEL', { modelKey }),
   getAvailableModels: () => send(getAIWorker, 'GET_AVAILABLE_MODELS', {}),
+};
+
+// Stream code runner console output to caller
+function getCodeRunnerWorker() {
+  if (!codeRunnerWorker) {
+    codeRunnerWorker = new Worker(new URL('./code-runner.worker.js', import.meta.url), { type: 'module' });
+    codeRunnerWorker.onmessage = (event) => {
+      const { type, id, ...data } = event.data;
+      const pending = pendingRequests.get(id);
+      if (!pending) return;
+      if (type === 'CONSOLE' && pending.onConsole) {
+        pending.onConsole(data);
+        return;
+      }
+      if (type === 'CODE_RESULT') {
+        pending.resolve(data);
+        pendingRequests.delete(id);
+      }
+    };
+  }
+  return codeRunnerWorker;
+}
+
+export const codeRunner = {
+  execute: (code, callbacks) => send(getCodeRunnerWorker, 'EXECUTE', {}, callbacks),
 };
 
 export const pdf = {

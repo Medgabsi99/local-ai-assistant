@@ -49,12 +49,14 @@ class HNSWIndex {
   }
 
   _distance(a, b) {
+    if (!a || !b) return Infinity;
     let d = 0;
     for (let i = 0; i < a.length; i++) d += (a[i] - b[i]) ** 2;
     return d;
   }
 
   _searchLayer(query, ep, lc) {
+    if (!this.data[ep]) return ep;
     let best = { node: ep, dist: this._distance(query, this.data[ep]) };
     const visited = new Set([ep]);
     let changed = true;
@@ -66,7 +68,10 @@ class HNSWIndex {
         if (visited.has(n)) continue;
         visited.add(n);
         const d = this._distance(query, this.data[n]);
-        if (d < best.dist) { best = { node: n, dist: d }; changed = true; }
+        if (d < best.dist) {
+          best = { node: n, dist: d };
+          changed = true;
+        }
       }
     }
     return best.node;
@@ -83,7 +88,10 @@ class HNSWIndex {
     }
     const l = this._randomLevel();
     if (l > this.L) {
-      for (let i = this.L + 1; i <= l; i++) { this.graph[i] = new Map(); this.graph[i].set(this.enterpoint, new Set()); }
+      for (let i = this.L + 1; i <= l; i++) {
+        this.graph[i] = new Map();
+        this.graph[i].set(this.enterpoint, new Set());
+      }
       this.L = l;
     }
     let ep = this.enterpoint;
@@ -117,7 +125,12 @@ class HNSWIndex {
       candidates.push({ node: curr, dist: this._distance(query, this.data[curr]) });
       const neighbors = this.graph[lc]?.get(curr);
       if (!neighbors) continue;
-      for (const n of neighbors) { if (!visited.has(n)) { visited.add(n); queue.push(n); } }
+      for (const n of neighbors) {
+        if (!visited.has(n)) {
+          visited.add(n);
+          queue.push(n);
+        }
+      }
     }
     candidates.sort((a, b) => a.dist - b.dist);
     return candidates.map((c) => c.node);
@@ -151,7 +164,7 @@ class HNSWIndex {
   }
 
   remove(idx) {
-    if (!this.data[idx]) return;
+    if (idx < 0 || idx >= this.data.length || !this.data[idx]) return;
     this.data[idx] = null;
     for (let lc = 0; lc <= this.L; lc++) {
       const layer = this.graph[lc];
@@ -161,12 +174,20 @@ class HNSWIndex {
     }
     if (this.enterpoint === idx) {
       for (let lc = this.L; lc >= 0; lc--) {
-        if (this.graph[lc]?.size > 0) { this.enterpoint = this.graph[lc].keys().next().value; break; }
+        if (this.graph[lc]?.size > 0) {
+          this.enterpoint = this.graph[lc].keys().next().value;
+          break;
+        }
       }
     }
   }
 
-  clear() { this.graph = []; this.data = []; this.enterpoint = null; this.L = 0; }
+  clear() {
+    this.graph = [];
+    this.data = [];
+    this.enterpoint = null;
+    this.L = 0;
+  }
 }
 
 // ============================================================
@@ -186,7 +207,12 @@ class VectorStore {
     const db = getDb();
     const all = await db.vectors.toArray();
     this.vectors = all.map((r) => r.embedding);
-    this.metadata = all.map((r) => ({ documentId: r.documentId, documentTitle: r.documentTitle, chunkIndex: r.chunkIndex, index: r.id }));
+    this.metadata = all.map((r) => ({
+      documentId: r.documentId,
+      documentTitle: r.documentTitle,
+      chunkIndex: r.chunkIndex,
+      index: r.id,
+    }));
     // Build HNSW index from existing vectors
     for (let i = 0; i < this.vectors.length; i++) {
       this.hnsw.insert(this.vectors[i], i);
@@ -198,8 +224,12 @@ class VectorStore {
     await this.init();
     const db = getDb();
     const id = await db.vectors.add({
-      embedding, documentId: metadata.documentId || null, documentTitle: metadata.documentTitle || '',
-      chunkIndex: metadata.chunkIndex ?? -1, tags: metadata.tags || [], createdAt: new Date().toISOString(),
+      embedding,
+      documentId: metadata.documentId || null,
+      documentTitle: metadata.documentTitle || '',
+      chunkIndex: metadata.chunkIndex ?? -1,
+      tags: metadata.tags || [],
+      createdAt: new Date().toISOString(),
     });
     const idx = this.vectors.length;
     this.vectors.push(embedding);
@@ -212,8 +242,12 @@ class VectorStore {
     await this.init();
     const db = getDb();
     const items = embeddings.map((embedding, i) => ({
-      embedding, documentId: metadatas[i]?.documentId || null, documentTitle: metadatas[i]?.documentTitle || '',
-      chunkIndex: metadatas[i]?.chunkIndex ?? -1, tags: metadatas[i]?.tags || [], createdAt: new Date().toISOString(),
+      embedding,
+      documentId: metadatas[i]?.documentId || null,
+      documentTitle: metadatas[i]?.documentTitle || '',
+      chunkIndex: metadatas[i]?.chunkIndex ?? -1,
+      tags: metadatas[i]?.tags || [],
+      createdAt: new Date().toISOString(),
     }));
     const ids = await db.vectors.bulkAdd(items, { allKeys: true });
     for (let i = 0; i < embeddings.length; i++) {
@@ -231,7 +265,12 @@ class VectorStore {
     await db.vectors.where('documentId').equals(documentId).delete();
     const remaining = await db.vectors.toArray();
     this.vectors = remaining.map((r) => r.embedding);
-    this.metadata = remaining.map((r) => ({ documentId: r.documentId, documentTitle: r.documentTitle, chunkIndex: r.chunkIndex, index: r.id }));
+    this.metadata = remaining.map((r) => ({
+      documentId: r.documentId,
+      documentTitle: r.documentTitle,
+      chunkIndex: r.chunkIndex,
+      index: r.id,
+    }));
     // Rebuild HNSW index
     this.hnsw.clear();
     for (let i = 0; i < this.vectors.length; i++) this.hnsw.insert(this.vectors[i], i);
@@ -265,8 +304,12 @@ class VectorStore {
     if (!Array.isArray(payload.vectors) || !Array.isArray(payload.metadata)) return;
     const db = getDb();
     const items = payload.vectors.map((embedding, i) => ({
-      embedding, documentId: payload.metadata[i]?.documentId || null, documentTitle: payload.metadata[i]?.documentTitle || '',
-      chunkIndex: payload.metadata[i]?.chunkIndex ?? -1, tags: payload.metadata[i]?.tags || [], createdAt: new Date().toISOString(),
+      embedding,
+      documentId: payload.metadata[i]?.documentId || null,
+      documentTitle: payload.metadata[i]?.documentTitle || '',
+      chunkIndex: payload.metadata[i]?.chunkIndex ?? -1,
+      tags: payload.metadata[i]?.tags || [],
+      createdAt: new Date().toISOString(),
     }));
     const ids = await db.vectors.bulkAdd(items, { allKeys: true });
     this.vectors = payload.vectors;
@@ -286,16 +329,26 @@ class VectorStore {
 
 function cosineSimilarity(a, b) {
   if (a.length !== b.length) throw new Error('Vectors must have the same dimension');
-  let dot = 0, na = 0, nb = 0;
-  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
-  na = Math.sqrt(na); nb = Math.sqrt(nb);
+  let dot = 0,
+    na = 0,
+    nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
+  }
+  na = Math.sqrt(na);
+  nb = Math.sqrt(nb);
   return na === 0 || nb === 0 ? 0 : dot / (na * nb);
 }
 
 let storeInstance = null;
 
 export async function getVectorStore() {
-  if (!storeInstance) { storeInstance = new VectorStore(); await storeInstance.init(); }
+  if (!storeInstance) {
+    storeInstance = new VectorStore();
+    await storeInstance.init();
+  }
   return storeInstance;
 }
 

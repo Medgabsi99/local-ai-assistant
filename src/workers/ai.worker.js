@@ -1,8 +1,10 @@
-import { pipeline, env } from '@xenova/transformers';
+import { env, pipeline } from '@xenova/transformers';
 
 try {
   env.allowLocalModels = false;
   env.useBrowserCache = true;
+  // Use IndexedDB for model cache persistence across sessions
+  env.localModelCache = 'indexeddb';
 } catch (e) {
   console.warn('Failed to configure transformers env:', e);
 }
@@ -62,10 +64,30 @@ const MODEL_CONFIGS = {
     loaded: false,
     downloadController: null,
   },
+  tts: {
+    name: 'Xenova/mms-tts-eng',
+    revision: 'main',
+    type: 'text-to-speech',
+    size: '~100MB',
+    instance: null,
+    loading: false,
+    loaded: false,
+    downloadController: null,
+  },
+  vision: {
+    name: 'Xenova/vit-gpt2-image-captioning',
+    revision: 'main',
+    type: 'image-to-text',
+    size: '~600MB',
+    instance: null,
+    loading: false,
+    loaded: false,
+    downloadController: null,
+  },
 };
 
+// Track download progress (in-memory)
 let activeDownloads = {};
-
 let inferenceAbortController = null;
 
 self.onmessage = async function (event) {
@@ -119,6 +141,12 @@ self.onmessage = async function (event) {
         break;
       case 'TRANSCRIBE_AUDIO':
         await handleTranscribeAudio(payload.audioData, id);
+        break;
+      case 'SYNTHESIZE_SPEECH':
+        await handleSynthesizeSpeech(payload.text, id);
+        break;
+      case 'CAPTION_IMAGE':
+        await handleCaptionImage(payload.imageData, id);
         break;
       case 'GET_DOWNLOAD_PROGRESS':
         handleGetDownloadProgress(id);
@@ -370,10 +398,15 @@ async function handleInference(payload, id) {
               }
               prev = tokens[0].length;
             }
-          } catch {}
+          } catch {
+            /* token decoding failed, skip */
+          }
         },
       });
-      if (signal.aborted) { inferenceAbortController = null; return; }
+      if (signal.aborted) {
+        inferenceAbortController = null;
+        return;
+      }
       const r = Array.isArray(gen) ? gen[0] : gen;
       self.postMessage({
         type: 'INFERENCE_COMPLETE',
@@ -384,7 +417,10 @@ async function handleInference(payload, id) {
       });
     } else {
       const r = await config.instance(prompt, { max_new_tokens: maxTokens, temperature, do_sample: temperature > 0 });
-      if (signal.aborted) { inferenceAbortController = null; return; }
+      if (signal.aborted) {
+        inferenceAbortController = null;
+        return;
+      }
       const t =
         typeof r === 'string'
           ? r
@@ -426,6 +462,46 @@ async function handleTranscribeAudio(audioData, id) {
   } catch {
     const r = await c.instance(audioData, { chunk_length_s: 30, return_timestamps: false });
     self.postMessage({ type: 'TRANSCRIPTION_RESULT', text: r.text, timeMs: Date.now() - t, fallback: true, id });
+  }
+}
+
+async function handleSynthesizeSpeech(text, id) {
+  const c = MODEL_CONFIGS.tts;
+  if (!c?.loaded) throw new Error('TTS model not loaded.');
+  const t = Date.now();
+  self.postMessage({ type: 'PROGRESS', status: 'synthesizing', message: 'Generating speech...', progress: 0, id });
+  const audio = await c.instance(text);
+  // The TTS pipeline returns an object with an audio Float32Array
+  const audioData = audio.audio || (audio instanceof Float32Array ? audio : audio.data);
+  const buffer = audioData.buffer.slice(audioData.byteOffset, audioData.byteOffset + audioData.byteLength);
+  self.postMessage(
+    {
+      type: 'SPEECH_RESULT',
+      audioData: buffer,
+      samplingRate: audio.sampling_rate || 16000,
+      timeMs: Date.now() - t,
+      id,
+    },
+    [buffer],
+  );
+}
+
+async function handleCaptionImage(imageData, id) {
+  const c = MODEL_CONFIGS.vision;
+  if (!c?.loaded) throw new Error('Vision model not loaded.');
+  const t = Date.now();
+  self.postMessage({ type: 'PROGRESS', status: 'analyzing', message: 'Analyzing image...', progress: 20, id });
+  try {
+    const result = await c.instance(imageData);
+    const caption = Array.isArray(result) ? result[0]?.generated_text || '' : result.generated_text || '';
+    self.postMessage({
+      type: 'CAPTION_RESULT',
+      caption,
+      timeMs: Date.now() - t,
+      id,
+    });
+  } catch (error) {
+    self.postMessage({ type: 'ERROR', error: `Image captioning failed: ${error.message}`, id });
   }
 }
 

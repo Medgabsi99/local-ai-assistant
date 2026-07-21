@@ -3,13 +3,24 @@
 // Free, no API key needed. Returns short summaries (not full pages).
 // ============================================================
 
-import { WEB_SEARCH_TIMEOUT_MS, WEB_FETCH_MAX_CHARS } from './constants';
+let abortController = null;
+
+export function cancelWebSearch() {
+  if (abortController) {
+    abortController.abort();
+    abortController = null;
+  }
+}
 
 export async function searchWeb(query) {
   try {
+    // Cancel any previous in-flight search
+    cancelWebSearch();
+    abortController = new AbortController();
+
     const res = await fetch(
       `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1&pretty=1`,
-      { signal: AbortSignal.timeout(5000) },
+      { signal: AbortSignal.any([abortController.signal, AbortSignal.timeout(5000)]) },
     );
 
     if (!res.ok) return null;

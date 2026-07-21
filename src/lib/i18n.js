@@ -118,6 +118,41 @@ const translations = {
     separate_with: 'Separate with commas.',
     tags_placeholder: 'research, pdf, ideas',
     vectors: 'vectors indexed',
+    // Accessibility & misc hardcoded strings
+    open_menu: 'Open menu',
+    close_menu: 'Close menu',
+    expand_sidebar: 'Expand sidebar',
+    collapse_sidebar: 'Collapse sidebar',
+    previous_match: 'Previous match',
+    next_match: 'Next match',
+    close_search: 'Close search',
+    dismiss_error: 'Dismiss error',
+    scroll_to_bottom: 'Scroll to bottom',
+    stop_generation: 'Stop generation',
+    back_online: 'Back online',
+    you_are_offline: 'You are offline',
+    loading: 'Loading...',
+    match_count: '0 matches',
+    filter_all: 'All',
+    filter_user: 'User',
+    filter_ai: 'AI',
+    data_cleared: 'Data cleared. Reloading...',
+    export_failed: 'Export failed: {message}',
+    import_failed: 'Import failed: {message}',
+    invalid_json: 'Invalid JSON file.',
+    replace_all_data: 'Replace all data with this backup?',
+    failed: 'Failed: {message}',
+    server_error: 'Server error: {message}.',
+    no_response: '(no response)',
+    transcription_error: 'Transcription error',
+    recording_error: 'Recording error',
+    microphone_denied: 'Microphone access denied.',
+    no_microphone: 'No microphone found.',
+    mic_unavailable: 'Microphone access is not available.',
+    unsupported_file: 'Unsupported file type.',
+    found: 'found',
+    data_imported: 'Data imported successfully.',
+    pdf_txt_md_csv: 'PDF, TXT, MD, CSV',
   },
   fr: {
     app_name: 'IA Locale',
@@ -237,6 +272,39 @@ const translations = {
     separate_with: 'Séparez par des virgules.',
     tags_placeholder: 'recherche, pdf, idées',
     vectors: 'vecteurs',
+    // Accessibility & misc hardcoded strings
+    open_menu: 'Ouvrir le menu',
+    close_menu: 'Fermer le menu',
+    expand_sidebar: 'Développer la barre',
+    collapse_sidebar: 'Réduire la barre',
+    previous_match: 'Résultat précédent',
+    next_match: 'Résultat suivant',
+    close_search: 'Fermer la recherche',
+    dismiss_error: "Ignorer l'erreur",
+    scroll_to_bottom: 'Descendre en bas',
+    stop_generation: 'Arrêter la génération',
+    back_online: 'De retour en ligne',
+    you_are_offline: 'Vous êtes hors ligne',
+    loading: 'Chargement...',
+    match_count: '0 correspondances',
+    filter_all: 'Tous',
+    filter_user: 'Utilisateur',
+    filter_ai: 'IA',
+    data_cleared: 'Données effacées. Rechargement...',
+    export_failed: 'Échec export : {message}',
+    import_failed: 'Échec import : {message}',
+    invalid_json: 'Fichier JSON invalide.',
+    replace_all_data: 'Remplacer toutes les données par cette sauvegarde ?',
+    failed: 'Échec : {message}',
+    server_error: 'Erreur serveur : {message}.',
+    no_response: '(pas de réponse)',
+    transcription_error: 'Erreur de transcription',
+    recording_error: 'Erreur denregistrement',
+    microphone_denied: 'Accès au microphone refusé.',
+    no_microphone: 'Aucun microphone trouvé.',
+    mic_unavailable: 'Accès au microphone non disponible.',
+    unsupported_file: 'Type de fichier non supporté.',
+    pdf_txt_md_csv: 'PDF, TXT, MD, CSV',
   },
   ar: {
     app_name: 'الذكاء المحلي',
@@ -350,6 +418,39 @@ const translations = {
     separate_with: 'افصل بينها بفواصل.',
     tags_placeholder: 'بحث، pdf، أفكار',
     vectors: 'متجهات',
+    // Accessibility & misc hardcoded strings
+    open_menu: 'فتح القائمة',
+    close_menu: 'إغلاق القائمة',
+    expand_sidebar: 'توسيع الشريط',
+    collapse_sidebar: 'طي الشريط',
+    previous_match: 'النتيجة السابقة',
+    next_match: 'النتيجة التالية',
+    close_search: 'إغلاق البحث',
+    dismiss_error: 'تجاهل الخطأ',
+    scroll_to_bottom: 'الانتقال للأسفل',
+    stop_generation: 'إيقاف التوليد',
+    back_online: 'العودة متصلاً',
+    you_are_offline: 'أنت غير متصل',
+    loading: 'جاري التحميل...',
+    match_count: '٠ نتيجة',
+    filter_all: 'الكل',
+    filter_user: 'مستخدم',
+    filter_ai: 'ذكاء',
+    data_cleared: 'تم مسح البيانات. جاري إعادة التحميل...',
+    export_failed: 'فشل التصدير: {message}',
+    import_failed: 'فشل الاستيراد: {message}',
+    invalid_json: 'ملف JSON غير صالح.',
+    replace_all_data: 'استبدال جميع البيانات بهذه النسخة الاحتياطية؟',
+    failed: 'فشل: {message}',
+    server_error: 'خطأ في الخادم: {message}.',
+    no_response: '(بدون رد)',
+    transcription_error: 'خطأ في النسخ',
+    recording_error: 'خطأ في التسجيل',
+    microphone_denied: 'تم رفض الوصول إلى الميكروفون.',
+    no_microphone: 'لم يتم العثور على ميكروفون.',
+    mic_unavailable: 'الوصول إلى الميكروفون غير متاح.',
+    unsupported_file: 'نوع الملف غير مدعوم.',
+    pdf_txt_md_csv: 'PDF, TXT, MD, CSV',
   },
 };
 
@@ -357,7 +458,9 @@ let currentLang = 'en';
 try {
   const saved = localStorage.getItem('lang');
   if (saved && translations[saved]) currentLang = saved;
-} catch (e) { console.warn('i18n init:', e); }
+} catch (e) {
+  console.warn('i18n init:', e);
+}
 
 export function t(key, params = {}) {
   let text = translations[currentLang]?.[key] || translations.en[key] || key;
@@ -368,7 +471,11 @@ export function t(key, params = {}) {
 export function setLanguage(lang) {
   if (translations[lang]) {
     currentLang = lang;
-    try { localStorage.setItem('lang', lang); } catch (e) { console.warn('i18n save:', e); }
+    try {
+      localStorage.setItem('lang', lang);
+    } catch (e) {
+      console.warn('i18n save:', e);
+    }
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.lang = lang;
   }

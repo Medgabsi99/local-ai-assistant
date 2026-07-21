@@ -22,7 +22,9 @@ try {
     const parsed = JSON.parse(saved);
     config = { ...config, ...parsed };
   }
-} catch (e) { console.warn('Server config load:', e); }
+} catch (e) {
+  console.warn('Server config load:', e);
+}
 
 export function getServerConfig() {
   return { ...config };
@@ -32,11 +34,14 @@ export function setServerConfig(updates) {
   config = { ...config, ...updates };
   try {
     localStorage.setItem('llm-server-config', JSON.stringify(config));
-  } catch (e) { console.warn('Server config save:', e); }
+  } catch (e) {
+    console.warn('Server config save:', e);
+  }
 }
 
 export async function checkServer() {
   try {
+    if (!config.baseUrl) return { available: false, error: 'No server URL configured' };
     const res = await fetch(`${config.baseUrl}/api/tags`, {
       signal: AbortSignal.timeout(3000),
     });
@@ -48,6 +53,19 @@ export async function checkServer() {
     };
   } catch (e) {
     return { available: false, error: e.message };
+  }
+}
+
+// Retry a failed server operation with exponential backoff
+export async function generateWithRetry(prompt, options = {}, retries = 2) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await generate(prompt, options);
+    } catch (error) {
+      if (attempt === retries) throw error;
+      // Exponential backoff: 1s, 2s
+      await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+    }
   }
 }
 
@@ -94,7 +112,9 @@ export async function generate(prompt, { onToken, onDone, maxTokens = 2048, temp
           if (data.done) {
             onDone?.(fullText);
           }
-        } catch (e) { console.warn('Server config load:', e); }
+        } catch (e) {
+          console.warn('Server config load:', e);
+        }
       }
     }
     return fullText;

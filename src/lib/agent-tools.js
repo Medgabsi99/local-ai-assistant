@@ -3,13 +3,85 @@
 // The AI can detect when to use tools and the agent handles them
 // ============================================================
 
-// Safe math expression evaluator
+// Safe math expression evaluator — recursive descent parser, no Function() constructor
 function safeEval(expr) {
   try {
-    // Only allow numbers, operators, parens, and basic math functions
-    // Convert ^ to ** (exponentiation) since Function() treats ^ as XOR
-    const sanitized = expr.replace(/[^0-9+\-*/.()^% ,e]/g, '').replace(/\^/g, '**');
-    const result = Function(`'use strict'; return (${sanitized})`)();
+    // Convert ^ to ** (exponentiation)
+    const sanitized = expr.replace(/\^/g, '**');
+    // Tokenize: numbers, operators, parens, exponentiation
+    const tokens = sanitized.match(/\d+\.?\d*|\*\*|[+\-*/()%]/g);
+    if (!tokens) return null;
+
+    let pos = 0;
+
+    function peek() {
+      return tokens[pos] || null;
+    }
+    function consume() {
+      return tokens[pos++];
+    }
+
+    function parseExpression() {
+      let result = parseTerm();
+      while (peek() === '+' || peek() === '-') {
+        const op = consume();
+        const right = parseTerm();
+        if (op === '+') result += right;
+        else result -= right;
+      }
+      return result;
+    }
+
+    function parseTerm() {
+      let result = parseFactor();
+      while (peek() === '*' || peek() === '/' || peek() === '%') {
+        const op = consume();
+        const right = parseFactor();
+        if (op === '*') result *= right;
+        else if (op === '/') result /= right;
+        else result %= right;
+      }
+      return result;
+    }
+
+    function parseFactor() {
+      const token = peek();
+      if (token === '(') {
+        consume(); // '('
+        const result = parseExpression();
+        if (peek() !== ')') return null;
+        consume(); // ')'
+        return result;
+      }
+      // Handle exponentiation (right-associative)
+      let base = parsePrimary();
+      if (peek() === '**') {
+        consume(); // '**'
+        const exp = parseFactor(); // right-associative
+        base = Math.pow(base, exp);
+      }
+      return base;
+    }
+
+    function parsePrimary() {
+      const token = peek();
+      if (token === '-') {
+        consume(); // '-'
+        return -parsePrimary();
+      }
+      if (token === '+') {
+        consume(); // '+'
+        return parsePrimary();
+      }
+      if (token && /^\d+\.?\d*$/.test(token)) {
+        consume();
+        return parseFloat(token);
+      }
+      return null;
+    }
+
+    const result = parseExpression();
+    if (pos !== tokens.length || result === null) return null;
     return Number.isFinite(result) ? result : null;
   } catch {
     return null;
@@ -143,9 +215,10 @@ export async function executeTool(toolCall) {
     case 'datetime':
       return `Current: ${args.result}`;
 
-    case 'fetch':
+    case 'fetch': {
       const content = await fetchURL(args.url);
       return `Content from ${args.url}: ${content}`;
+    }
 
     default:
       return null;

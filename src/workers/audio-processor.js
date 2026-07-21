@@ -211,11 +211,10 @@ function cancelRecording(id) {
 // Convert audio blob to Float32Array at 16kHz mono
 // This is what Whisper expects
 async function blobToAudioData(blob) {
-  // Create AudioContext
+  // Create OfflineAudioContext (available in workers)
+  // AudioContext is NOT available in workers, but we only need decodeAudioData
   if (!audioContext) {
-    audioContext = new (self.AudioContext || self.webkitAudioContext)({
-      sampleRate: 16000,
-    });
+    audioContext = new OfflineAudioContext(1, 1, 16000);
   }
 
   // Decode audio
