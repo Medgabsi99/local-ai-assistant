@@ -7,6 +7,7 @@ export default function ModelStatus() {
     embedding: { loaded: false, loading: false, name: 'all-MiniLM-L6-v2' },
     llm: { loaded: false, loading: false, name: 'LaMini-Flan-T5-783M' },
     whisper: { loaded: false, loading: false, name: 'Whisper Tiny EN' },
+    vision: { loaded: false, loading: false, name: 'Image Captioning' },
   });
   const [progress, setProgress] = useState({});
   const [downloadInfo, setDownloadInfo] = useState({});
@@ -23,7 +24,9 @@ export default function ModelStatus() {
           setAvailableModels(result.models);
           setSelectedModel(result.models[0]);
         }
-      } catch (e) { console.warn('Available models:', e); }
+      } catch (e) {
+        console.warn('Available models:', e);
+      }
     })();
   }, []);
 
@@ -33,7 +36,6 @@ export default function ModelStatus() {
       const states = {};
       for (const [key, info] of Object.entries(result.statuses)) {
         states[key] = {
-          ...modelStates[key],
           loaded: info.loaded,
           loading: info.loading,
           name: info.name,
@@ -50,7 +52,7 @@ export default function ModelStatus() {
   }, []);
 
   useEffect(() => {
-    checkModels();
+    checkModels().catch(() => {});
   }, [checkModels]);
 
   const loadModel = async (modelName) => {
@@ -148,6 +150,14 @@ export default function ModelStatus() {
       icon: '🎤',
       desc: '',
       size: '~150MB',
+      required: false,
+    },
+    {
+      key: 'vision',
+      label: 'Image Understanding',
+      icon: '📷',
+      desc: 'Analyze images alongside text search',
+      size: '~600MB',
       required: false,
     },
   ];

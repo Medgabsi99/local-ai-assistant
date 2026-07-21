@@ -5,8 +5,6 @@ export default function ChatTopBar({
   useRAGMode,
   setUseRAGMode,
   embeddingModelReady,
-  showSystemPrompt,
-  setShowSystemPrompt,
   webSearchEnabled,
   setWebSearchEnabled,
   theme,
@@ -20,7 +18,6 @@ export default function ChatTopBar({
   setShowSearch,
   isGenerating,
   onRegenerate,
-  showShareModal,
   setShowShareModal,
 }) {
   return (

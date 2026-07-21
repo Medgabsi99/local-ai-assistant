@@ -28,11 +28,17 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
 
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error('Microphone access is not available.');
+        throw new Error(t('mic_unavailable'));
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { channelCount: 1, sampleRate: AUDIO_SAMPLE_RATE, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        audio: {
+          channelCount: 1,
+          sampleRate: AUDIO_SAMPLE_RATE,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       });
 
       streamRef.current = stream;
@@ -51,7 +57,7 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
       };
 
       recorder.onerror = (e) => {
-        setError(e.error?.message || 'Recording error');
+        setError(e.error?.message || t('recording_error'));
         setRecordingState('idle');
       };
 
@@ -61,9 +67,9 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
       timerRef.current = setInterval(updateDuration, 1000);
     } catch (err) {
       if (err.name === 'NotAllowedError') {
-        setError('Microphone access denied.');
+        setError(t('microphone_denied'));
       } else if (err.name === 'NotFoundError') {
-        setError('No microphone found.');
+        setError(t('no_microphone'));
       } else {
         setError(err.message);
       }
@@ -90,7 +96,7 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
             const blob = new Blob(chunksRef.current, { type: mimeType });
 
             const arrayBuffer = await blob.arrayBuffer();
-      const audioCtx = new AudioContext({ sampleRate: AUDIO_SAMPLE_RATE });
+            const audioCtx = new AudioContext({ sampleRate: AUDIO_SAMPLE_RATE });
             const decoded = await audioCtx.decodeAudioData(arrayBuffer);
             audioCtx.close();
 
@@ -170,6 +176,7 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
           className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors text-sm"
           title={t('read_aloud')}
           aria-label={t('read_aloud')}
+          aria-pressed={recordingState !== 'idle'}
         >
           <Mic size={16} />
           <span>{t('upload')}</span>
@@ -188,15 +195,29 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
 
           <div className="flex items-end gap-0.5 h-5">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="w-1 bg-red-500 rounded-t transition-all duration-100" style={{ height: `${Math.min(100, audioLevel * (i * 0.3))}%`, opacity: 0.3 + i * 0.15 }} />
+              <div
+                key={i}
+                className="w-1 bg-red-500 rounded-t transition-all duration-100"
+                style={{ height: `${Math.min(100, audioLevel * (i * 0.3))}%`, opacity: 0.3 + i * 0.15 }}
+              />
             ))}
           </div>
 
-          <button onClick={pauseRecording} className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors" title={t('pause')} aria-label={t('pause')}>
+          <button
+            onClick={pauseRecording}
+            className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors"
+            title={t('pause')}
+            aria-label={t('pause')}
+          >
             <Pause size={14} />
           </button>
 
-          <button onClick={stopRecording} className="p-1.5 bg-red-600 hover:bg-red-500 rounded text-white transition-colors" title={t('stop')} aria-label={t('stop')}>
+          <button
+            onClick={stopRecording}
+            className="p-1.5 bg-red-600 hover:bg-red-500 rounded text-white transition-colors"
+            title={t('stop')}
+            aria-label={t('stop')}
+          >
             <Square size={14} />
           </button>
         </div>
@@ -206,15 +227,30 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
         <div className="flex items-center gap-2">
           <span className="text-xs text-yellow-400 font-mono">⏸ {formatTime(duration)}</span>
 
-          <button onClick={resumeRecording} className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors" title={t('resume')} aria-label={t('resume')}>
+          <button
+            onClick={resumeRecording}
+            className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors"
+            title={t('resume')}
+            aria-label={t('resume')}
+          >
             <Play size={14} />
           </button>
 
-          <button onClick={stopRecording} className="p-1.5 bg-red-600 hover:bg-red-500 rounded text-white transition-colors" title={t('stop')} aria-label={t('stop')}>
+          <button
+            onClick={stopRecording}
+            className="p-1.5 bg-red-600 hover:bg-red-500 rounded text-white transition-colors"
+            title={t('stop')}
+            aria-label={t('stop')}
+          >
             <Square size={14} />
           </button>
 
-          <button onClick={cancelRecording} className="p-1.5 hover:bg-slate-700 rounded text-slate-500 hover:text-slate-300 transition-colors" title={t('record_cancel')} aria-label={t('record_cancel')}>
+          <button
+            onClick={cancelRecording}
+            className="p-1.5 hover:bg-slate-700 rounded text-slate-500 hover:text-slate-300 transition-colors"
+            title={t('record_cancel')}
+            aria-label={t('record_cancel')}
+          >
             <X size={14} />
           </button>
         </div>
@@ -231,7 +267,13 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
         <div className="text-xs text-red-400 flex items-center gap-1">
           <span>⚠</span>
           <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-400" aria-label="Dismiss error">✕</button>
+          <button
+            onClick={() => setError(null)}
+            className="text-red-500 hover:text-red-400"
+            aria-label={t('dismiss_error')}
+          >
+            ✕
+          </button>
         </div>
       )}
     </div>
