@@ -179,7 +179,33 @@ function getCodeRunnerWorker() {
 }
 
 export const codeRunner = {
-  execute: (code, callbacks) => send(getCodeRunnerWorker, 'EXECUTE', {}, callbacks),
+  execute: (code, callbacks) => {
+    // Main-thread watchdog: terminate worker if it doesn't respond within 6s
+    // This catches synchronous infinite loops that can't be stopped from inside.
+    const watchdogTimer = setTimeout(() => {
+      if (codeRunnerWorker) {
+        codeRunnerWorker.terminate();
+        codeRunnerWorker = null;
+      }
+    }, 6000);
+    const wrappedCallbacks = {
+      ...callbacks,
+      onConsole: (data) => {
+        // Clear watchdog on any console output (worker is alive)
+        clearTimeout(watchdogTimer);
+        callbacks?.onConsole?.(data);
+      },
+    };
+    return send(getCodeRunnerWorker, 'EXECUTE', { code }, wrappedCallbacks).finally(() => {
+      clearTimeout(watchdogTimer);
+    });
+  },
+  terminate: () => {
+    if (codeRunnerWorker) {
+      codeRunnerWorker.terminate();
+      codeRunnerWorker = null;
+    }
+  },
 };
 
 export const pdf = {
@@ -198,11 +224,12 @@ export const audio = {
 };
 
 export function terminateAll() {
-  [aiWorker, pdfWorker, audioWorker].forEach((worker) => {
+  [aiWorker, pdfWorker, audioWorker, codeRunnerWorker].forEach((worker) => {
     if (worker) worker.terminate();
   });
   aiWorker = null;
   pdfWorker = null;
   audioWorker = null;
+  codeRunnerWorker = null;
   pendingRequests.clear();
 }

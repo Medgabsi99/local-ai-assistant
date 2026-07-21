@@ -8,9 +8,18 @@
 self.fetch = null;
 self.XMLHttpRequest = null;
 self.WebSocket = null;
-
-// Override importScripts to prevent loading external scripts
 self.importScripts = null;
+
+// Shadow self to prevent access to IndexedDB and other origin-scoped APIs
+// new Function() resolves free identifiers against the global scope,
+// so we must override self at the global level.
+Object.defineProperty(self, 'self', { value: null, writable: false, configurable: false });
+Object.defineProperty(self, 'indexedDB', { value: null, writable: false, configurable: false });
+Object.defineProperty(self, 'caches', { value: null, writable: false, configurable: false });
+Object.defineProperty(self, 'location', { value: null, writable: false, configurable: false });
+Object.defineProperty(self, 'navigator', { value: null, writable: false, configurable: false });
+Object.defineProperty(self, 'window', { value: null, writable: false, configurable: false });
+Object.defineProperty(self, 'globalThis', { value: null, writable: false, configurable: false });
 
 // Whitelist of safe globals available to user code
 const SAFE_GLOBALS = {
@@ -69,8 +78,15 @@ const SAFE_GLOBALS = {
   TextDecoder,
 };
 
+// Main-thread watchdog: if the main thread sends a TERMINATE message, kill this worker
 self.onmessage = function (event) {
   const { type, payload, id } = event.data;
+
+  if (type === 'TERMINATE') {
+    self.close();
+    return;
+  }
+
   const code = payload?.code;
   const timeout = 5000;
 
@@ -84,10 +100,14 @@ self.onmessage = function (event) {
 
   const startTime = performance.now();
 
-  // Set up a timeout
+  // Set up a polling-based watchdog for synchronous infinite loops.
+  // The timeout fires only when the stack is empty, so we use a separate
+  // approach: the main thread will terminate this worker if it doesn't
+  // respond within the timeout period. We signal back on completion.
   const timeoutId = setTimeout(() => {
-    result.error = 'Execution timed out after ' + timeout + 'ms';
-    self.postMessage({ type: 'CODE_RESULT', ...result });
+    // If we reach here, the code completed (or threw) — this is a fallback
+    // for async code that hangs. Synchronous infinite loops are handled
+    // by the main thread's terminate-on-timeout logic.
   }, timeout);
 
   try {
@@ -96,10 +116,13 @@ self.onmessage = function (event) {
     const values = keys.map((k) => SAFE_GLOBALS[k]);
 
     // Create and execute the function in sandboxed scope
-    const fn = new Function(...keys, `
+    const fn = new Function(
+      ...keys,
+      `
       "use strict";
       ${code}
-    `);
+    `,
+    );
 
     const output = fn(...values);
 

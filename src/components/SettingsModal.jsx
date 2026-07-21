@@ -2,16 +2,19 @@ import { useRef, useState, useEffect } from 'react';
 import { ai } from '../workers/worker-bridge';
 import { db, exportAppData, importAppData, getConversationMessages, setSetting } from '../db/database';
 import { getVectorStore, resetVectorStore } from '../lib/vector-store-access';
+import { exportRateLimiter } from '../lib/security';
 import { getServerConfig, setServerConfig, checkServer } from '../lib/llm-server';
 import { t, getLanguage, getLanguages } from '../lib/i18n';
 import { useLang, useToast } from '../contexts';
 import { ACCENT_COLORS } from '../lib/constants';
 import { BarChart3, Globe, Palette, Server } from 'lucide-react';
 import VectorStoreManager from './VectorStoreManager';
+import MemoryPanel from './MemoryPanel';
 
 export default function SettingsModal({ isOpen, onClose }) {
   const [storageEstimate, setStorageEstimate] = useState(null);
   const [showVectorManager, setShowVectorManager] = useState(false);
+  const [showMemoryPanel, setShowMemoryPanel] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [transferring, setTransferring] = useState(false);
   const importInputRef = useRef(null);
@@ -103,6 +106,11 @@ export default function SettingsModal({ isOpen, onClose }) {
   };
 
   const handleExportData = async () => {
+    // Rate limiting — max 3 exports per minute
+    if (!exportRateLimiter.canCall('export')) {
+      toast?.('Rate limited: too many export requests. Please wait.', 'error');
+      return;
+    }
     setTransferring(true);
     try {
       const store = await getVectorStore();
@@ -314,6 +322,12 @@ export default function SettingsModal({ isOpen, onClose }) {
                 {t('vectors')}
               </button>
               <button
+                onClick={() => setShowMemoryPanel(true)}
+                className="w-full px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm transition-colors text-left"
+              >
+                🧠 {t('memory')}
+              </button>
+              <button
                 onClick={handleClearAllData}
                 disabled={clearing}
                 className="w-full px-4 py-2.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-sm transition-colors border border-red-800/50 disabled:opacity-50"
@@ -405,6 +419,7 @@ export default function SettingsModal({ isOpen, onClose }) {
         onChange={handleImportFile}
       />
       <VectorStoreManager isOpen={showVectorManager} onClose={() => setShowVectorManager(false)} />
+      <MemoryPanel isOpen={showMemoryPanel} onClose={() => setShowMemoryPanel(false)} />
     </>
   );
 }

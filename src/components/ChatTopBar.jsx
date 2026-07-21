@@ -1,5 +1,5 @@
 import { t } from '../lib/i18n';
-import { Sun, Moon, Search, Globe, Bot, ClipboardList, Share2, RefreshCw } from 'lucide-react';
+import { Sun, Moon, Search, Globe, Bot, ClipboardList, Share2, RefreshCw, Lightbulb } from 'lucide-react';
 
 export default function ChatTopBar({
   useRAGMode,
@@ -19,6 +19,8 @@ export default function ChatTopBar({
   isGenerating,
   onRegenerate,
   setShowShareModal,
+  smartRepliesEnabled,
+  setSmartRepliesEnabled,
 }) {
   return (
     <div
@@ -99,6 +101,15 @@ export default function ChatTopBar({
             <Share2 size={14} />
           </button>
         )}
+        <button
+          onClick={() => setSmartRepliesEnabled(!smartRepliesEnabled)}
+          className={`text-xs px-2 py-1 rounded-md hover:bg-white/5 transition-colors ${smartRepliesEnabled ? 'bg-emerald-500/20 text-emerald-400' : ''}`}
+          style={{ color: smartRepliesEnabled ? undefined : 'var(--text-muted)' }}
+          title="Smart replies (doubles inference per turn)"
+          aria-label="Toggle smart replies"
+        >
+          <Lightbulb size={14} />
+        </button>
         {messages.length > 1 && (
           <button
             onClick={onRegenerate}

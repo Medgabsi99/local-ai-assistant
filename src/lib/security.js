@@ -1,24 +1,16 @@
 // ============================================================
-// Security utilities — input sanitization, CSP, rate limiting
+// Security utilities — XSS sanitization (via DOMPurify), CSP, rate limiting, SSRF protection
 // ============================================================
 
+import DOMPurify from 'dompurify';
+
 /**
- * Sanitize user-provided text to prevent XSS
+ * Sanitize user-provided text to prevent XSS.
+ * Uses DOMPurify — the standard, battle-tested sanitization library.
  */
 export function sanitizeText(input) {
   if (!input) return '';
-  // Strip HTML tags
-  let text = input.replace(/<[^>]*>/g, '');
-  // Decode HTML entities to prevent encoded XSS
-  text = text.replace(/</g, '<').replace(/>/g, '>').replace(/&/g, '&');
-  // Remove event handlers (onclick, onerror, etc.)
-  text = text.replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, '');
-  text = text.replace(/\bon\w+\s*=\s*[^\s>]+/gi, '');
-  // Remove javascript: URLs
-  text = text.replace(/javascript:\s*/gi, '');
-  // Remove data: URLs that could contain executable content
-  text = text.replace(/data:\s*text\/html/gi, '');
-  return text.trim();
+  return DOMPurify.sanitize(input, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
 }
 
 /**
@@ -41,7 +33,6 @@ export class RateLimiter {
   canCall(key) {
     const now = Date.now();
     const timestamps = this.calls.get(key) || [];
-    // Remove expired timestamps
     const valid = timestamps.filter((t) => now - t < this.windowMs);
     this.calls.set(key, valid);
     if (valid.length >= this.maxCalls) return false;
@@ -60,8 +51,8 @@ export const webSearchRateLimiter = new RateLimiter(5, 60000); // 5 calls per mi
 export const exportRateLimiter = new RateLimiter(3, 60000); // 3 exports per minute
 
 /**
- * Validate a URL is safe to fetch (for external web search)
- * Allows localhost for local LLM server connections
+ * Validate a URL is safe to fetch (for external web search).
+ * Uses exact hostname match (not substring) to prevent SSRF bypass via IP encoding tricks.
  */
 export function isValidUrl(url, allowLocalhost = false) {
   try {
@@ -69,9 +60,10 @@ export function isValidUrl(url, allowLocalhost = false) {
     const allowedProtocols = ['http:', 'https:'];
     if (!allowedProtocols.includes(parsed.protocol)) return false;
     if (!allowLocalhost) {
-      // Block common SSRF targets for external fetches
+      // Exact-match blocklist for SSRF targets — prevents IP encoding bypasses
+      const hostname = parsed.hostname.toLowerCase();
       const blockedHosts = ['localhost', '127.0.0.1', '0.0.0.0', '[::1]', '169.254.169.254'];
-      if (blockedHosts.some((h) => parsed.hostname.includes(h))) return false;
+      if (blockedHosts.includes(hostname)) return false;
     }
     return true;
   } catch {
@@ -80,12 +72,16 @@ export function isValidUrl(url, allowLocalhost = false) {
 }
 
 /**
- * Content-Security-Policy headers (for HTML meta tag or server config)
+ * Content-Security-Policy directives.
+ * This CSP prevents external resource loading & data exfiltration,
+ * but does NOT prevent injected inline scripts from executing
+ * ('unsafe-inline' is required because Vite emits an inline script tag in production).
+ * For full coverage before main.jsx executes, deploy with public/_headers (Netlify/Cloudflare).
  */
 export function getCSPDirectives() {
   return {
     'default-src': ["'self'"],
-    'script-src': ["'self'", "'unsafe-eval'", "'unsafe-inline'"], // unsafe-eval needed for transformers.js
+    'script-src': ["'self'", "'unsafe-eval'", "'unsafe-inline'"],
     'style-src': ["'self'", "'unsafe-inline'"],
     'img-src': ["'self'", 'data:', 'blob:'],
     'font-src': ["'self'", 'data:'],
@@ -100,11 +96,15 @@ export function getCSPDirectives() {
     ],
     'media-src': ["'self'", 'blob:'],
     'worker-src': ["'self'", 'blob:'],
+    'frame-src': ["'none'"],
+    'object-src': ["'none'"],
   };
 }
 
 /**
- * Apply CSP as a meta tag (for environments where HTTP headers can't be set)
+ * Apply CSP as a meta tag (for environments where HTTP headers can't be set).
+ * Only takes effect once main.jsx executes. For full coverage before page load,
+ * deploy with the public/_headers file.
  */
 export function applyCSP() {
   const directives = getCSPDirectives();

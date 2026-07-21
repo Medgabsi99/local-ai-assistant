@@ -1,0 +1,23 @@
+# Normalize line endings to LF in the repository
+# Windows users will get CRLF in their working tree automatically
+* text=auto
+
+# Explicitly mark these as text files
+*.js text
+*.jsx text
+*.css text
+*.html text
+*.json text
+*.md text
+*.yml text
+*.yaml text
+*.sh text
+
+# Binary files should not be normalized
+*.png binary
+*.jpg binary
+*.svg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.node binary

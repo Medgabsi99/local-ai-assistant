@@ -3,6 +3,8 @@
 // Free, no API key needed. Returns short summaries (not full pages).
 // ============================================================
 
+import { webSearchRateLimiter } from './security';
+
 let abortController = null;
 
 export function cancelWebSearch() {
@@ -13,6 +15,9 @@ export function cancelWebSearch() {
 }
 
 export async function searchWeb(query) {
+  // Rate limiting — max 5 web searches per minute
+  if (!webSearchRateLimiter.canCall('web')) return null;
+
   try {
     // Cancel any previous in-flight search
     cancelWebSearch();

@@ -5,21 +5,8 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { getConversationMessages, addMessage, deleteMessage, toggleMessageStar } from '../db/database';
 import { t } from '../lib/i18n';
-import {
-  Lock,
-  Star,
-  Volume2,
-  Copy,
-  Pencil,
-  Trash2,
-  Bold,
-  Italic,
-  Code,
-  Link,
-  List,
-  BookOpen,
-  Square,
-} from 'lucide-react';
+import { Lock, Bold, Italic, Code, Link, List, BookOpen, Play } from 'lucide-react';
+import { codeRunner } from '../workers/worker-bridge';
 import { useToast, useModelStatus } from '../contexts';
 import { SCROLL_THRESHOLD_PX } from '../lib/constants';
 import { reportError } from '../lib/error-handler';
@@ -34,38 +21,9 @@ import ShareModal from './ShareModal';
 import AudioRecorder from './AudioRecorder';
 import { useSmartReplies } from '../hooks/useSmartReplies';
 import { useImageAttachments } from '../hooks/useImageAttachments';
-import MarkdownImage from './MarkdownImage';
+import MessageBubble from './MessageBubble';
 
-// Highlight matching text in search results
-function HighlightedText({ text, searchQuery }) {
-  if (!searchQuery.trim()) return <>{text}</>;
-  const q = searchQuery.toLowerCase();
-  const lower = text.toLowerCase();
-  const parts = [];
-  let lastIndex = 0;
-  let idx = lower.indexOf(q, lastIndex);
-  while (idx !== -1) {
-    if (idx > lastIndex) parts.push({ match: false, text: text.slice(lastIndex, idx) });
-    parts.push({ match: true, text: text.slice(idx, idx + q.length) });
-    lastIndex = idx + q.length;
-    idx = lower.indexOf(q, lastIndex);
-  }
-  if (lastIndex < text.length) parts.push({ match: false, text: text.slice(lastIndex) });
-  return (
-    <span>
-      {parts.map((part, i) =>
-        part.match ? (
-          <mark key={i} className="bg-emerald-500/30 text-emerald-200 rounded-sm px-0.5">
-            {part.text}
-          </mark>
-        ) : (
-          <span key={i}>{part.text}</span>
-        ),
-      )}
-    </span>
-  );
-}
-
+// Reusable code block for streaming content (extracted to keep ChatArea manageable)
 function CodeBlock({ className, children }) {
   const match = /language-(\w+)/.exec(className || '');
   const lang = match ? match[1] : '';
@@ -80,7 +38,10 @@ function CodeBlock({ className, children }) {
           className="hover:text-slate-300 transition-colors"
           aria-label={t('copy')}
         >
-          <Copy size={12} />
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
         </button>
       </div>
       <SyntaxHighlighter
@@ -111,12 +72,12 @@ export default function ChatArea({ conversationId }) {
   const [showShareModal, setShowShareModal] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [agentMode, setAgentMode] = useState(false);
+  const [smartRepliesEnabled, setSmartRepliesEnabled] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const messagesRef = useRef(null);
-  // Guard refs to prevent race conditions on async operations
   const processingRef = useRef(false);
   const saveEditIdRef = useRef(0);
 
@@ -140,7 +101,7 @@ export default function ChatArea({ conversationId }) {
     toast,
   });
 
-  const { suggestions } = useSmartReplies(messages);
+  const { suggestions, generateSuggestions } = useSmartReplies(messages);
   const { pendingImages, addImage, removeImage, clearImages, handleFileDrop, handlePaste, buildMessageContent } =
     useImageAttachments();
 
@@ -156,11 +117,9 @@ export default function ChatArea({ conversationId }) {
     searchResults,
     activeSearchId,
     totalMatchCount,
-    getHighlights,
     searchInputRef,
   } = useMessageSearch(messages, showSearch, setShowSearch);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     loadMessages().catch(() => {});
   }, [loadMessages]);
@@ -171,12 +130,22 @@ export default function ChatArea({ conversationId }) {
     if (!isGenerating) inputRef.current?.focus();
   }, [isGenerating]);
 
+  const lastMessageRef = useRef(null);
+  useEffect(() => {
+    if (!smartRepliesEnabled) return;
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg && lastMsg.role === 'assistant' && lastMsg.id !== lastMessageRef.current) {
+      lastMessageRef.current = lastMsg.id;
+      if (lastMsg.content.length > 10) generateSuggestions(lastMsg.content);
+    }
+  }, [messages, generateSuggestions, smartRepliesEnabled]);
+
   const handleTranscription = (text) => setInput((prev) => prev + (prev ? ' ' : '') + text);
 
   const handleScroll = useCallback(() => {
     const el = messagesRef.current;
     if (!el) return;
-    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < SCROLL_THRESHOLD_PX;
+    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     setUserScrolledUp(!isAtBottom);
     setShowScrollBtn(!isAtBottom && messages.length > 0);
   }, [messages.length]);
@@ -201,21 +170,15 @@ export default function ChatArea({ conversationId }) {
     if (!editContent.trim() || processingRef.current) return;
     const saveId = ++saveEditIdRef.current;
     processingRef.current = true;
-    const content = editContent.trim();
     try {
       await deleteMessage(msgId);
-      await addMessage(conversationId, 'user', content);
+      await addMessage(conversationId, 'user', editContent.trim());
       setEditingMessageId(null);
       setEditContent('');
       await loadMessages();
-      // Only generate reply if this is still the latest saveEdit call
-      if (saveId === saveEditIdRef.current) {
-        await generateReply(content);
-      }
+      if (saveId === saveEditIdRef.current) await generateReply(editContent.trim());
     } finally {
-      if (saveId === saveEditIdRef.current) {
-        processingRef.current = false;
-      }
+      if (saveId === saveEditIdRef.current) processingRef.current = false;
     }
   };
   const deleteMsg = async (msgId) => {
@@ -314,6 +277,8 @@ export default function ChatArea({ conversationId }) {
         isGenerating={isGenerating}
         onRegenerate={regenerate}
         setShowShareModal={setShowShareModal}
+        smartRepliesEnabled={smartRepliesEnabled}
+        setSmartRepliesEnabled={setSmartRepliesEnabled}
       />
 
       <SearchBar
@@ -341,7 +306,6 @@ export default function ChatArea({ conversationId }) {
         setInput={setInput}
         inputRef={inputRef}
       />
-
       <ShareModal
         showShareModal={showShareModal}
         setShowShareModal={setShowShareModal}
@@ -358,8 +322,7 @@ export default function ChatArea({ conversationId }) {
         }}
         onDrop={async (e) => {
           e.preventDefault();
-          const dropped = await handleFileDrop(e);
-          if (dropped) toast?.('📷 Image(s) dropped', 'success');
+          if (await handleFileDrop(e)) toast?.('📷 Image(s) dropped', 'success');
         }}
         className="flex-1 overflow-y-auto px-4 py-5 space-y-4"
       >
@@ -371,164 +334,23 @@ export default function ChatArea({ conversationId }) {
           </div>
         )}
         {(searchQuery.trim() || filterRole !== 'all' ? filteredMessages : messages).map((msg) => (
-          <div
+          <MessageBubble
             key={msg.id}
-            id={`msg-${msg.id}`}
-            className={`group flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in ${activeSearchId === msg.id ? 'ring-2 ring-emerald-500/40 ring-offset-2 rounded-xl' : ''}`}
-            style={{ ringOffsetColor: 'var(--bg-primary)' }}
-          >
-            <div className="max-w-[80%]">
-              {editingMessageId === msg.id ? (
-                <div
-                  className="border border-emerald-500/30 rounded-xl p-3"
-                  style={{ background: 'var(--bg-secondary)' }}
-                >
-                  <textarea
-                    value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
-                    className="w-full bg-transparent text-sm outline-none resize-none mb-2"
-                    rows={3}
-                    style={{ color: 'var(--text-primary)' }}
-                  />
-                  <div className="flex gap-2 justify-end">
-                    <button
-                      onClick={cancelEdit}
-                      className="text-xs px-2 py-1 rounded hover:bg-white/5"
-                      style={{ color: 'var(--text-secondary)' }}
-                    >
-                      {t('cancel_label')}
-                    </button>
-                    <button
-                      onClick={() => saveEdit(msg.id)}
-                      className="text-xs bg-emerald-500 hover:bg-emerald-400 text-white px-3 py-1 rounded-md"
-                    >
-                      {t('save_send')}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className={msg.role === 'user' ? 'msg-user' : 'msg-ai'}>
-                  {/* Plain text search matches highlighted */}
-                  {searchQuery.trim() && getHighlights(msg.content).length > 0 ? (
-                    <div className="prose prose-invert prose-sm max-w-none prose-code:before:content-none prose-code:after:content-none">
-                      <HighlightedText text={msg.content} searchQuery={searchQuery} />
-                    </div>
-                  ) : (
-                    <div className="prose prose-invert prose-sm max-w-none prose-code:before:content-none prose-code:after:content-none">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        components={{
-                          img({ src, alt }) {
-                            return <MarkdownImage src={src} alt={alt} />;
-                          },
-                          code({ inline, className, children, ...props }) {
-                            if (inline)
-                              return (
-                                <code
-                                  className="bg-slate-700/60 px-1 py-0.5 rounded text-emerald-300 text-[13px]"
-                                  {...props}
-                                >
-                                  {children}
-                                </code>
-                              );
-                            return <CodeBlock className={className}>{children}</CodeBlock>;
-                          },
-                        }}
-                      >
-                        {msg.content}
-                      </ReactMarkdown>
-                    </div>
-                  )}
-                  {msg.metadata?.contextSources?.length > 0 && (
-                    <p className="mt-2 pt-2 border-t border-slate-600/30 text-xs text-slate-400">
-                      {t('sources')} {msg.metadata.contextSources.join(', ')}
-                    </p>
-                  )}
-                </div>
-              )}
-              {editingMessageId !== msg.id && (
-                <div
-                  className={`flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <button
-                    onClick={() => toggleStar(msg.id)}
-                    className="text-[10px] px-1.5 py-0.5 rounded hover:bg-white/5"
-                    style={{ color: msg.metadata?.starred ? '#f59e0b' : 'var(--text-muted)' }}
-                    title={msg.metadata?.starred ? t('unstar') : t('star')}
-                  >
-                    <Star size={12} fill={msg.metadata?.starred ? '#f59e0b' : 'none'} />
-                  </button>
-                  {msg.role === 'assistant' && (
-                    <button
-                      onClick={() => {
-                        if (speaking) {
-                          if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-                          setSpeaking(false);
-                          return;
-                        }
-                        if ('speechSynthesis' in window) {
-                          window.speechSynthesis.cancel();
-                          const u = new SpeechSynthesisUtterance(msg.content.replace(/<[^>]*>/g, ''));
-                          u.onend = () => setSpeaking(false);
-                          const voices = window.speechSynthesis.getVoices();
-                          const v =
-                            voices.find(
-                              (x) =>
-                                x.name.includes('Google UK Female') ||
-                                x.name.includes('Microsoft Zira') ||
-                                x.name.includes('Samantha'),
-                            ) ||
-                            voices.find((x) => x.lang.startsWith('en') && x.name.includes('Female')) ||
-                            voices.find((x) => x.lang.startsWith('en'));
-                          if (v) u.voice = v;
-                          u.rate = 1.05;
-                          u.pitch = 1.05;
-                          setSpeaking(true);
-                          window.speechSynthesis.speak(u);
-                        }
-                      }}
-                      className="text-[10px] px-1.5 py-0.5 rounded hover:bg-white/5"
-                      style={{ color: speaking ? '#ef4444' : 'var(--text-muted)' }}
-                      title={speaking ? t('stop') : t('read_aloud')}
-                    >
-                      {speaking ? <Square size={12} /> : <Volume2 size={12} />}
-                    </button>
-                  )}
-                  <button
-                    onClick={() => copyMessage(msg.content)}
-                    className="text-[10px] px-1.5 py-0.5 rounded hover:bg-white/5"
-                    style={{ color: 'var(--text-muted)' }}
-                    title={t('copy')}
-                  >
-                    <Copy size={12} />
-                  </button>
-                  {msg.role === 'user' && (
-                    <button
-                      onClick={() => startEdit(msg)}
-                      className="text-[10px] px-1.5 py-0.5 rounded hover:bg-white/5"
-                      style={{ color: 'var(--text-muted)' }}
-                      title={t('edit')}
-                    >
-                      <Pencil size={12} />
-                    </button>
-                  )}
-                  <button
-                    onClick={() => deleteMsg(msg.id)}
-                    className="text-[10px] px-1.5 py-0.5 rounded hover:bg-white/5"
-                    style={{ color: 'var(--text-muted)' }}
-                    title={t('del')}
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                  <span className="text-[10px] ml-1" style={{ color: 'var(--text-muted)' }}>
-                    {msg.metadata?.timeMs ? `${(msg.metadata.timeMs / 1000).toFixed(1)}s · ` : ''}
-                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    {msg.metadata?.starred && ' ⭐'}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
+            msg={msg}
+            searchQuery={searchQuery}
+            activeSearchId={activeSearchId}
+            editingMessageId={editingMessageId}
+            editContent={editContent}
+            setEditContent={setEditContent}
+            onSaveEdit={saveEdit}
+            onCancelEdit={cancelEdit}
+            onStartEdit={startEdit}
+            onDelete={deleteMsg}
+            onToggleStar={toggleStar}
+            onCopy={copyMessage}
+            speaking={speaking}
+            setSpeaking={setSpeaking}
+          />
         ))}
         {isGenerating && (
           <div className="flex justify-start animate-fade-in">
@@ -568,7 +390,6 @@ export default function ChatArea({ conversationId }) {
             </div>
           </div>
         )}
-        {/* Smart reply suggestions */}
         {suggestions.length > 0 && !isGenerating && (
           <div className="px-4 py-2 flex gap-2 flex-wrap">
             {suggestions.map((s, i) => (
@@ -589,32 +410,42 @@ export default function ChatArea({ conversationId }) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Pending image previews */}
       {pendingImages.length > 0 && (
-        <div className="px-4 pt-2 flex gap-2 overflow-x-auto" style={{ background: 'var(--bg-primary)' }}>
-          {pendingImages.map((img) => (
-            <div key={img.id} className="relative group shrink-0">
-              <img
-                src={img.dataUrl}
-                alt={img.name}
-                className="w-14 h-14 rounded-lg object-cover border border-slate-600"
-              />
-              <button
-                onClick={() => removeImage(img.id)}
-                className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 hover:bg-red-400 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                title="Remove image"
-              >
-                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                  <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
-              </button>
-              {img.caption && (
-                <p className="text-[9px] mt-0.5 max-w-14 truncate" style={{ color: 'var(--text-muted)' }}>
-                  {img.caption.slice(0, 20)}
-                </p>
-              )}
-            </div>
-          ))}
+        <div className="px-4 pt-2" style={{ background: 'var(--bg-primary)' }}>
+          <div className="flex gap-2 overflow-x-auto">
+            {pendingImages.map((img) => (
+              <div key={img.id} className="relative group shrink-0">
+                <img
+                  src={img.dataUrl}
+                  alt={img.name}
+                  className="w-14 h-14 rounded-lg object-cover border border-slate-600"
+                />
+                <button
+                  onClick={() => removeImage(img.id)}
+                  className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 hover:bg-red-400 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Remove image"
+                >
+                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </button>
+                {img.caption && (
+                  <p className="text-[9px] mt-0.5 max-w-14 truncate" style={{ color: 'var(--text-muted)' }}>
+                    {img.caption.slice(0, 20)}
+                  </p>
+                )}
+                {!img.caption && !img.visionLoaded && (
+                  <p className="text-[8px] mt-0.5 text-amber-500/70 max-w-14 leading-tight">No caption</p>
+                )}
+              </div>
+            ))}
+          </div>
+          {pendingImages.some((img) => !img.caption) && (
+            <p className="text-[10px] mt-1.5 text-amber-500/60">
+              📷 Image attached — AI may not see its contents. Download the <strong>Image Understanding</strong> model
+              in the sidebar to enable automatic captions.
+            </p>
+          )}
         </div>
       )}
       <div
@@ -622,68 +453,50 @@ export default function ChatArea({ conversationId }) {
         style={{ borderColor: 'var(--border)', background: 'var(--bg-primary)' }}
       >
         <div className="flex items-center gap-0.5 mb-2 flex-wrap">
-          <button
-            onClick={() => insertMarkdown('**', '**')}
-            className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5"
-            style={{ color: 'var(--text-muted)' }}
-            title={t('bold')}
-            aria-label={t('bold')}
-          >
-            <Bold size={14} />
-          </button>
-          <button
-            onClick={() => insertMarkdown('*', '*')}
-            className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5"
-            style={{ color: 'var(--text-muted)' }}
-            title={t('italic')}
-            aria-label={t('italic')}
-          >
-            <Italic size={14} />
-          </button>
-          <button
-            onClick={() => insertMarkdown('`', '`')}
-            className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5"
-            style={{ color: 'var(--text-muted)' }}
-            title={t('code')}
-            aria-label={t('code')}
-          >
-            <Code size={14} />
-          </button>
-          <button
-            onClick={() => insertMarkdown('[', '](url)')}
-            className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5"
-            style={{ color: 'var(--text-muted)' }}
-            title={t('link')}
-            aria-label={t('link')}
-          >
-            <Link size={14} />
-          </button>
-          <button
-            onClick={() => insertMarkdown('- ')}
-            className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5"
-            style={{ color: 'var(--text-muted)' }}
-            title={t('list')}
-            aria-label={t('list')}
-          >
-            <List size={14} />
-          </button>
-          <button
-            onClick={() => insertMarkdown('```\n', '\n```')}
-            className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5"
-            style={{ color: 'var(--text-muted)' }}
-            title={t('code_block')}
-            aria-label={t('code_block')}
-          >
-            <BookOpen size={14} />
-          </button>
+          {[
+            { icon: Bold, action: () => insertMarkdown('**', '**'), label: t('bold') },
+            { icon: Italic, action: () => insertMarkdown('*', '*'), label: t('italic') },
+            { icon: Code, action: () => insertMarkdown('`', '`'), label: t('code') },
+            { icon: Link, action: () => insertMarkdown('[', '](url)'), label: t('link') },
+            { icon: List, action: () => insertMarkdown('- '), label: t('list') },
+            { icon: BookOpen, action: () => insertMarkdown('```\n', '\n```'), label: t('code_block') },
+            {
+              icon: Play,
+              action: async () => {
+                const code = input.trim();
+                if (!code || isGenerating) return;
+                toast?.('⏳ Running code...', 'info');
+                try {
+                  const result = await codeRunner.execute(code);
+                  const output = result?.output || '';
+                  const error = result?.error || '';
+                  if (output) setInput((prev) => prev + `\n// Output:\n${output}`);
+                  if (error) setInput((prev) => prev + `\n// Error:\n${error}`);
+                  toast?.(result?.error ? '❌ Code error' : '✅ Code executed', result?.error ? 'error' : 'success');
+                } catch (e) {
+                  toast?.(`❌ ${e.message}`, 'error');
+                }
+              },
+              label: 'Run code',
+            },
+          ].map(({ icon: Icon, action, label }) => (
+            <button
+              key={label}
+              onClick={action}
+              className="w-7 h-7 flex items-center justify-center rounded text-xs hover:bg-white/5"
+              style={{ color: 'var(--text-muted)' }}
+              title={label}
+              aria-label={label}
+            >
+              <Icon size={14} />
+            </button>
+          ))}
           <span className="text-[10px] ml-auto" style={{ color: 'var(--text-muted)' }}>
             {t('markdown')}
           </span>
         </div>
         <div className="flex gap-2 max-w-4xl mx-auto">
           <AudioRecorder onTranscriptionComplete={handleTranscription} />
-
-          {/* Image attachment button */}
           <input
             type="file"
             accept="image/*"
@@ -693,12 +506,8 @@ export default function ChatArea({ conversationId }) {
             onChange={async (e) => {
               const files = Array.from(e.target.files || []);
               e.target.value = '';
-              for (const file of files) {
-                await addImage(file);
-              }
-              if (files.length > 0) {
-                toast?.(`📷 ${files.length} image(s) attached`, 'success');
-              }
+              for (const file of files) await addImage(file);
+              if (files.length > 0) toast?.(`📷 ${files.length} image(s) attached`, 'success');
             }}
           />
           <label

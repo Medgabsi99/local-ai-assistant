@@ -1,5 +1,6 @@
 import Dexie from 'dexie';
 import { getVectorStore } from '../lib/vector-store-access';
+import { sanitizeText, sanitizeTitle } from '../lib/security';
 
 class LocalAIDatabase extends Dexie {
   constructor() {
@@ -136,7 +137,7 @@ export async function getAllChunks() {
 export async function createConversation(title = 'New Chat') {
   const now = new Date().toISOString();
   return db.conversations.add({
-    title,
+    title: sanitizeTitle(title),
     pinned: false,
     createdAt: now,
     updatedAt: now,
@@ -150,7 +151,7 @@ export async function addMessage(conversationId, role, content, metadata = {}) {
   return db.messages.add({
     conversationId,
     role,
-    content,
+    content: sanitizeText(content),
     timestamp: new Date().toISOString(),
     metadata,
   });
