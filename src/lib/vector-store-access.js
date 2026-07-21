@@ -9,3 +9,7 @@ export async function getVectorStore() {
 
   return vectorStorePromise;
 }
+
+export function resetVectorStore() {
+  vectorStorePromise = null;
+}
