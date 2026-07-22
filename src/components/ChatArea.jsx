@@ -5,8 +5,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { getConversationMessages, addMessage, deleteMessage, toggleMessageStar } from '../db/database';
 import { t } from '../lib/i18n';
-import { Lock, Bold, Italic, Code, Link, List, BookOpen, Play } from 'lucide-react';
-import { codeRunner } from '../workers/worker-bridge';
+import { Lock, Bold, Italic, Code, Link, List, BookOpen } from 'lucide-react';
 import { useToast, useModelStatus } from '../contexts';
 import { SCROLL_THRESHOLD_PX } from '../lib/constants';
 import { reportError } from '../lib/error-handler';
@@ -460,25 +459,6 @@ export default function ChatArea({ conversationId }) {
             { icon: Link, action: () => insertMarkdown('[', '](url)'), label: t('link') },
             { icon: List, action: () => insertMarkdown('- '), label: t('list') },
             { icon: BookOpen, action: () => insertMarkdown('```\n', '\n```'), label: t('code_block') },
-            {
-              icon: Play,
-              action: async () => {
-                const code = input.trim();
-                if (!code || isGenerating) return;
-                toast?.('⏳ Running code...', 'info');
-                try {
-                  const result = await codeRunner.execute(code);
-                  const output = result?.output || '';
-                  const error = result?.error || '';
-                  if (output) setInput((prev) => prev + `\n// Output:\n${output}`);
-                  if (error) setInput((prev) => prev + `\n// Error:\n${error}`);
-                  toast?.(result?.error ? '❌ Code error' : '✅ Code executed', result?.error ? 'error' : 'success');
-                } catch (e) {
-                  toast?.(`❌ ${e.message}`, 'error');
-                }
-              },
-              label: 'Run code',
-            },
           ].map(({ icon: Icon, action, label }) => (
             <button
               key={label}

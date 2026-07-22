@@ -5,7 +5,6 @@
 let aiWorker = null;
 let pdfWorker = null;
 let audioWorker = null;
-let codeRunnerWorker = null;
 let pendingRequests = new Map();
 let requestId = 0;
 
@@ -103,8 +102,6 @@ function handleMessage(event) {
     'RECORDING_CANCELLED',
     'RECORDING_STATUS',
     'RECORDING_ERROR',
-    'CODE_RESULT',
-    'CONSOLE',
   ];
 
   if (terminalTypes.includes(type)) {
@@ -157,57 +154,6 @@ export const ai = {
   getAvailableModels: () => send(getAIWorker, 'GET_AVAILABLE_MODELS', {}),
 };
 
-// Stream code runner console output to caller
-function getCodeRunnerWorker() {
-  if (!codeRunnerWorker) {
-    codeRunnerWorker = new Worker(new URL('./code-runner.worker.js', import.meta.url), { type: 'module' });
-    codeRunnerWorker.onmessage = (event) => {
-      const { type, id, ...data } = event.data;
-      const pending = pendingRequests.get(id);
-      if (!pending) return;
-      if (type === 'CONSOLE' && pending.onConsole) {
-        pending.onConsole(data);
-        return;
-      }
-      if (type === 'CODE_RESULT') {
-        pending.resolve(data);
-        pendingRequests.delete(id);
-      }
-    };
-  }
-  return codeRunnerWorker;
-}
-
-export const codeRunner = {
-  execute: (code, callbacks) => {
-    // Main-thread watchdog: terminate worker if it doesn't respond within 6s
-    // This catches synchronous infinite loops that can't be stopped from inside.
-    const watchdogTimer = setTimeout(() => {
-      if (codeRunnerWorker) {
-        codeRunnerWorker.terminate();
-        codeRunnerWorker = null;
-      }
-    }, 6000);
-    const wrappedCallbacks = {
-      ...callbacks,
-      onConsole: (data) => {
-        // Clear watchdog on any console output (worker is alive)
-        clearTimeout(watchdogTimer);
-        callbacks?.onConsole?.(data);
-      },
-    };
-    return send(getCodeRunnerWorker, 'EXECUTE', { code }, wrappedCallbacks).finally(() => {
-      clearTimeout(watchdogTimer);
-    });
-  },
-  terminate: () => {
-    if (codeRunnerWorker) {
-      codeRunnerWorker.terminate();
-      codeRunnerWorker = null;
-    }
-  },
-};
-
 export const pdf = {
   extract: (arrayBuffer, filename, callbacks) =>
     send(getPDFWorker, 'EXTRACT_PDF', { arrayBuffer, filename }, callbacks),
@@ -224,12 +170,11 @@ export const audio = {
 };
 
 export function terminateAll() {
-  [aiWorker, pdfWorker, audioWorker, codeRunnerWorker].forEach((worker) => {
+  [aiWorker, pdfWorker, audioWorker].forEach((worker) => {
     if (worker) worker.terminate();
   });
   aiWorker = null;
   pdfWorker = null;
   audioWorker = null;
-  codeRunnerWorker = null;
   pendingRequests.clear();
 }
