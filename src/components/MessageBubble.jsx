@@ -92,7 +92,7 @@ export default function MessageBubble({
   return (
     <div
       id={`msg-${msg.id}`}
-      className={`group flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in ${activeSearchId === msg.id ? 'ring-2 ring-emerald-500/40 ring-offset-2 rounded-xl' : ''}`}
+      className={`group flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-slide-up ${activeSearchId === msg.id ? 'ring-2 ring-emerald-500/40 ring-offset-2 rounded-xl' : ''}`}
       style={{ ringOffsetColor: 'var(--bg-primary)' }}
     >
       <div className="max-w-[80%]">
