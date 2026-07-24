@@ -1,4 +1,5 @@
 import { t } from '../lib/i18n';
+import { Search, X, ChevronUp, ChevronDown, Filter } from 'lucide-react';
 
 export default function SearchBar({
   searchQuery,
@@ -14,76 +15,78 @@ export default function SearchBar({
   setShowSearch,
 }) {
   if (!showSearch) return null;
+
   return (
-    <div className="px-4 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
-      <div className="flex items-center gap-2">
-        <input
-          ref={searchInputRef}
-          value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value);
-            setSearchIndex(0);
-          }}
-          placeholder={t('search_messages')}
-          aria-label={t('search_messages')}
-          className="flex-1 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-emerald-500/50"
-          style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
-        />
-        {searchQuery.trim() && (
-          <span className="text-[10px] whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
-            {searchResults.length > 0
-              ? `${searchIndex + 1}/${searchResults.length} msgs · ${totalMatchCount} matches`
-              : t('match_count')}
+    <div
+      className="px-3 py-2 border-b flex items-center gap-2 flex-shrink-0"
+      style={{ borderColor: 'var(--border)', background: 'var(--bg-secondary)' }}
+    >
+      <Search size={14} style={{ color: 'var(--text-muted)' }} />
+      <input
+        ref={searchInputRef}
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        placeholder={t('search_messages')}
+        autoFocus
+        className="flex-1 bg-transparent text-xs outline-none"
+        style={{ color: 'var(--text-primary)' }}
+        aria-label={t('search_messages')}
+      />
+      {searchQuery && (
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+            {totalMatchCount > 0 ? `${searchIndex + 1}/${totalMatchCount}` : '0/0'}
           </span>
-        )}
-        <div className="flex gap-0.5">
-          {['all', 'user', 'assistant'].map((role) => (
-            <button
-              key={role}
-              onClick={() => {
-                setFilterRole(role);
-                setSearchIndex(0);
-              }}
-              className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${filterRole === role ? 'bg-emerald-500/20 text-emerald-300' : ''}`}
-              style={{
-                background: filterRole === role ? undefined : 'var(--bg-hover)',
-                color: filterRole === role ? undefined : 'var(--text-muted)',
-              }}
-            >
-              {role === 'all' ? t('filter_all') : role === 'user' ? t('filter_user') : t('filter_ai')}
-            </button>
-          ))}
+          <button
+            onClick={() => setSearchIndex(Math.max(0, searchIndex - 1))}
+            disabled={totalMatchCount === 0}
+            className="btn-icon disabled:opacity-30"
+            style={{ color: 'var(--text-muted)' }}
+            aria-label={t('previous_match')}
+          >
+            <ChevronUp size={12} />
+          </button>
+          <button
+            onClick={() => setSearchIndex(Math.min(totalMatchCount - 1, searchIndex + 1))}
+            disabled={totalMatchCount === 0}
+            className="btn-icon disabled:opacity-30"
+            style={{ color: 'var(--text-muted)' }}
+            aria-label={t('next_match')}
+          >
+            <ChevronDown size={12} />
+          </button>
+          <div className="flex items-center gap-1 pl-1.5 border-l" style={{ borderColor: 'var(--border)' }}>
+            <Filter size={12} style={{ color: 'var(--text-muted)' }} />
+            {['all', 'user', 'assistant'].map((role) => (
+              <button
+                key={role}
+                onClick={() => setFilterRole(role)}
+                className={`text-[10px] px-2 py-0.5 rounded-md font-medium transition-all ${
+                  filterRole === role ? 'ring-1' : 'hover:bg-white/5'
+                }`}
+                style={{
+                  background: filterRole === role ? 'var(--accent-light)' : 'transparent',
+                  color: filterRole === role ? 'var(--accent)' : 'var(--text-muted)',
+                  ringColor: filterRole === role ? 'var(--accent-ring)' : 'transparent',
+                }}
+              >
+                {role === 'all' ? t('filter_all') : role === 'user' ? t('filter_user') : t('filter_ai')}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => {
+              setSearchQuery('');
+              setShowSearch(false);
+            }}
+            className="btn-icon"
+            style={{ color: 'var(--text-muted)' }}
+            aria-label={t('close_search')}
+          >
+            <X size={12} />
+          </button>
         </div>
-        <button
-          onClick={() => setSearchIndex((i) => Math.max(0, i - 1))}
-          disabled={searchResults.length === 0}
-          className="text-xs disabled:opacity-30 px-1"
-          style={{ color: 'var(--text-muted)' }}
-          aria-label={t('previous_match')}
-        >
-          ▲
-        </button>
-        <button
-          onClick={() => setSearchIndex((i) => Math.min(searchResults.length - 1, i + 1))}
-          disabled={searchResults.length === 0}
-          className="text-xs disabled:opacity-30 px-1"
-          style={{ color: 'var(--text-muted)' }}
-          aria-label={t('next_match')}
-        >
-          ▼
-        </button>
-        <button
-          onClick={() => {
-            setShowSearch(false);
-            setSearchQuery('');
-          }}
-          className="text-xs px-1"
-          style={{ color: 'var(--text-muted)' }}
-          aria-label={t('close_search')}
-        >
-          ✕
-        </button>
-      </div>
+      )}
     </div>
   );
 }

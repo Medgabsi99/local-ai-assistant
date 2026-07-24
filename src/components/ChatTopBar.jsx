@@ -22,21 +22,40 @@ export default function ChatTopBar({
   smartRepliesEnabled,
   setSmartRepliesEnabled,
 }) {
+  const ToggleBtn = ({ active, onClick, icon: Icon, label, title }) => (
+    <button
+      onClick={onClick}
+      className={`btn-icon transition-all duration-200 ${active ? 'bg-accent/20 text-accent ring-1 ring-accent/30' : ''}`}
+      style={{ color: active ? 'var(--accent)' : 'var(--text-muted)' }}
+      title={title || label}
+      aria-label={label}
+    >
+      <Icon size={14} />
+    </button>
+  );
+
   return (
     <div
-      className="px-4 py-2 border-b flex items-center justify-between flex-shrink-0 gap-2"
+      className="px-3 py-1.5 border-b flex items-center justify-between flex-shrink-0 gap-2"
       style={{ borderColor: 'var(--border)', background: 'var(--bg-secondary)' }}
     >
-      <label className="flex items-center gap-2 cursor-pointer select-none flex-shrink-0">
-        <input
-          type="checkbox"
-          checked={useRAGMode}
-          onChange={(e) => setUseRAGMode(e.target.checked)}
-          className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500/30 focus:ring-offset-0 cursor-pointer"
-        />
+      {/* RAG Toggle */}
+      <label className="flex items-center gap-2 cursor-pointer select-none flex-shrink-0 group">
+        <div className="relative">
+          <input
+            type="checkbox"
+            checked={useRAGMode}
+            onChange={(e) => setUseRAGMode(e.target.checked)}
+            className="sr-only peer"
+          />
+          <div
+            className="w-8 h-4 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all"
+            style={{ background: useRAGMode ? 'var(--accent)' : 'var(--border)' }}
+          />
+        </div>
         <span
-          className={`text-xs font-medium ${useRAGMode ? 'text-emerald-400' : ''}`}
-          style={{ color: useRAGMode ? '#34d399' : 'var(--text-muted)' }}
+          className={`text-xs font-medium transition-colors ${useRAGMode ? 'text-accent' : ''}`}
+          style={{ color: useRAGMode ? 'var(--accent)' : 'var(--text-muted)' }}
         >
           {t('rag_mode')}
         </span>
@@ -46,79 +65,40 @@ export default function ChatTopBar({
           </span>
         )}
       </label>
-      <div className="flex items-center gap-1 ml-auto">
-        <button
+
+      {/* Action Buttons */}
+      <div className="flex items-center gap-0.5">
+        <ToggleBtn
+          active={webSearchEnabled}
           onClick={() => setWebSearchEnabled(!webSearchEnabled)}
-          className={`text-xs px-2 py-1 rounded-md hover:bg-white/5 transition-colors ${webSearchEnabled ? 'bg-emerald-500/20 text-emerald-400' : ''}`}
-          style={{ color: webSearchEnabled ? undefined : 'var(--text-muted)' }}
-          title={t('web_search')}
-          aria-label={t('web_search')}
-        >
-          <Globe size={14} />
-        </button>
-        <button
-          onClick={() => setShowSearch(!showSearch)}
-          className="text-xs px-2 py-1 rounded-md hover:bg-white/5"
-          style={{ color: 'var(--text-muted)' }}
-          title={t('search')}
-          aria-label={t('search')}
-        >
-          <Search size={14} />
-        </button>
-        <button
-          onClick={toggleTheme}
-          className="text-xs px-2 py-1 rounded-md hover:bg-white/5"
-          style={{ color: 'var(--text-muted)' }}
-          aria-label="Toggle theme"
-        >
-          {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-        </button>
-        <button
-          onClick={() => setAgentMode(!agentMode)}
-          className={`text-xs px-2 py-1 rounded-md hover:bg-white/5 transition-colors ${agentMode ? 'bg-emerald-500/20 text-emerald-400' : ''}`}
-          style={{ color: agentMode ? undefined : 'var(--text-muted)' }}
-          title={t('agent_mode')}
-          aria-label={t('agent_mode')}
-        >
-          <Bot size={14} />
-        </button>
-        <button
+          icon={Globe}
+          label={t('web_search')}
+        />
+        <ToggleBtn onClick={() => setShowSearch(!showSearch)} icon={Search} label={t('search')} />
+        <ToggleBtn onClick={toggleTheme} icon={theme === 'dark' ? Sun : Moon} label="Toggle theme" />
+        <ToggleBtn active={agentMode} onClick={() => setAgentMode(!agentMode)} icon={Bot} label={t('agent_mode')} />
+        <ToggleBtn
           onClick={() => setShowTemplates(!showTemplates)}
-          className="text-xs px-2 py-1 rounded-md hover:bg-white/5"
-          style={{ color: 'var(--text-muted)' }}
-          title={t('prompt_templates')}
-          aria-label={t('prompt_templates')}
-        >
-          <ClipboardList size={14} />
-        </button>
-        {messages.length > 0 && (
-          <button
-            onClick={() => setShowShareModal(true)}
-            className="text-xs px-2 py-1 rounded-md hover:bg-white/5"
-            style={{ color: 'var(--text-muted)' }}
-            aria-label={t('share')}
-          >
-            <Share2 size={14} />
-          </button>
-        )}
-        <button
+          icon={ClipboardList}
+          label={t('prompt_templates')}
+        />
+        {messages.length > 0 && <ToggleBtn onClick={() => setShowShareModal(true)} icon={Share2} label={t('share')} />}
+        <ToggleBtn
+          active={smartRepliesEnabled}
           onClick={() => setSmartRepliesEnabled(!smartRepliesEnabled)}
-          className={`text-xs px-2 py-1 rounded-md hover:bg-white/5 transition-colors ${smartRepliesEnabled ? 'bg-emerald-500/20 text-emerald-400' : ''}`}
-          style={{ color: smartRepliesEnabled ? undefined : 'var(--text-muted)' }}
+          icon={Lightbulb}
+          label="Smart replies"
           title="Smart replies (doubles inference per turn)"
-          aria-label="Toggle smart replies"
-        >
-          <Lightbulb size={14} />
-        </button>
+        />
         {messages.length > 1 && (
           <button
             onClick={onRegenerate}
             disabled={isGenerating}
-            className="text-xs disabled:opacity-40 px-2 py-1 rounded-md hover:bg-white/5"
+            className="btn-icon disabled:opacity-30 transition-all"
             style={{ color: 'var(--text-muted)' }}
             aria-label={t('regenerate')}
           >
-            <RefreshCw size={14} />
+            <RefreshCw size={14} className={isGenerating ? 'animate-spin' : ''} />
           </button>
         )}
       </div>
