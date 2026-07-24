@@ -4,7 +4,20 @@ import { useRAG } from '../hooks/useRAG';
 import { getAllDocuments, getDocument, deleteDocument, updateDocument, deleteDocumentVectors } from '../db/database';
 import { DOC_PREVIEW_MAX_CHARS, TAGS_MAX_COUNT } from '../lib/constants';
 import PdfViewer from './PdfViewer';
-import { FileText, File, BarChart3, Paperclip, Folder, Trash2, Search, Upload, X, Save, Tag } from 'lucide-react';
+import {
+  FileText,
+  File,
+  BarChart3,
+  Paperclip,
+  Folder,
+  Trash2,
+  Search,
+  Upload,
+  X,
+  Save,
+  Tag,
+  FileUp,
+} from 'lucide-react';
 
 export default function DocumentPane() {
   const [documents, setDocuments] = useState([]);
@@ -123,7 +136,6 @@ export default function DocumentPane() {
 
   return (
     <div className="flex flex-col md:flex-row h-full">
-      {/* Sidebar */}
       <div
         className="w-full md:w-80 flex flex-col md:max-h-full max-h-[40vh]"
         style={{ borderRight: '1px solid var(--border)' }}
@@ -158,7 +170,7 @@ export default function DocumentPane() {
               {t('documents')}
             </h2>
             <label
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg cursor-pointer transition-all active:scale-[0.97] ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'bg-emerald-500 hover:bg-emerald-400 text-white'}`}
+              className={`interactive flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg cursor-pointer ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'bg-emerald-500 hover:bg-emerald-400 text-white'}`}
             >
               <Upload size={12} /> {isProcessing ? t('processing') : t('upload')}
               <input
@@ -189,7 +201,7 @@ export default function DocumentPane() {
             />
           </div>
           {isProcessing && (
-            <div className="card p-3 space-y-1.5">
+            <div className="card p-3 space-y-1.5 animate-fade-in">
               <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                 {progress.message}
               </p>
@@ -203,7 +215,7 @@ export default function DocumentPane() {
           )}
           {error && (
             <div
-              className="rounded-xl p-2.5 flex items-start gap-2"
+              className="rounded-xl p-2.5 flex items-start gap-2 animate-slide-left"
               style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}
             >
               <p className="text-xs flex-1" style={{ color: '#f87171' }}>
@@ -229,22 +241,27 @@ export default function DocumentPane() {
         </div>
         <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
           {documents.length === 0 && !isProcessing && (
-            <div className="text-center py-12">
-              <Folder size={36} className="mx-auto mb-3" style={{ color: 'var(--text-muted)' }} />
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            <div className="text-center py-12 animate-fade-in">
+              <div className="empty-state-icon">
+                <FileUp size={28} />
+              </div>
+              <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
                 {t('no_documents')}
               </p>
               <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                PDF, TXT, MD, CSV
+                Drop files or click Upload to add PDF, TXT, MD, CSV
               </p>
             </div>
           )}
-          {filteredDocuments.map((doc) => (
+          {filteredDocuments.map((doc, i) => (
             <div
               key={doc.id}
               onClick={() => handleViewDocument(doc.id)}
-              className={`card card-hover p-3 cursor-pointer ${selectedDoc === doc.id ? 'ring-1' : ''}`}
-              style={{ ringColor: selectedDoc === doc.id ? 'var(--accent-ring)' : 'transparent' }}
+              className={`card card-hover p-3 cursor-pointer list-enter ${selectedDoc === doc.id ? 'ring-1' : ''}`}
+              style={{
+                ringColor: selectedDoc === doc.id ? 'var(--accent-ring)' : 'transparent',
+                animationDelay: `${i * 30}ms`,
+              }}
             >
               <div className="flex items-center gap-3">
                 <span style={{ color: 'var(--text-muted)' }}>{getFileIcon(doc.fileType)}</span>
@@ -285,10 +302,9 @@ export default function DocumentPane() {
         </div>
       </div>
 
-      {/* Content */}
       <div className="flex-1 p-5 overflow-y-auto min-w-0">
         {selectedDoc && docContent ? (
-          <div>
+          <div className="animate-fade-in">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
                 {selectedDocument?.title || t('documents')}
@@ -322,7 +338,7 @@ export default function DocumentPane() {
                 />
                 <button
                   onClick={handleSaveTags}
-                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white transition-all active:scale-[0.97]"
+                  className="interactive flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white"
                 >
                   <Save size={12} /> {t('save')}
                 </button>
@@ -369,8 +385,10 @@ export default function DocumentPane() {
             )}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full gap-3">
-            <FileText size={40} style={{ color: 'var(--text-muted)' }} />
+          <div className="flex flex-col items-center justify-center h-full gap-3 animate-fade-in">
+            <div className="empty-state-icon">
+              <FileText size={28} />
+            </div>
             <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
               {t('no_documents')}
             </p>

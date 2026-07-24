@@ -8,7 +8,8 @@ import { hybridSearch } from '../lib/hybrid-search';
 export function useRAG() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState({ status: '', message: '', progress: 0 });
-  const [capturedImage, setCapturedImage] = useState(null); // { dataUrl, file }
+  const [capturedImage, setCapturedImage] = useState(null);
+  const [error, setError] = useState(null);
   const vectorStoreRef = useRef(null);
 
   const getStore = async () => {
@@ -20,6 +21,7 @@ export function useRAG() {
 
   const processPDF = useCallback(async (file) => {
     setIsProcessing(true);
+    setError(null);
     setProgress({ status: 'reading', message: 'Reading file...', progress: 0 });
     try {
       const arrayBuffer = await file.arrayBuffer();
@@ -46,6 +48,7 @@ export function useRAG() {
       setProgress({ status: 'complete', message: 'Document processed!', progress: 100 });
       return { docId, totalChunks: chunkResult.chunks.length, totalPages: extractionResult.totalPages };
     } catch (error) {
+      setError(error.message);
       setProgress({ status: 'error', message: error.message, progress: 0 });
       throw error;
     } finally {
@@ -55,6 +58,7 @@ export function useRAG() {
 
   const processText = useCallback(async (content, title, fileType) => {
     setIsProcessing(true);
+    setError(null);
     setProgress({ status: 'saving', message: 'Processing text...', progress: 20 });
     try {
       const docId = await saveDocument({ title, content, fileType });
@@ -72,6 +76,7 @@ export function useRAG() {
       setProgress({ status: 'complete', message: 'Document processed!', progress: 100 });
       return { docId, totalChunks: chunkResult.chunks.length };
     } catch (error) {
+      setError(error.message);
       setProgress({ status: 'error', message: error.message, progress: 0 });
       throw error;
     } finally {
@@ -115,27 +120,22 @@ export function useRAG() {
     }
 
     const reRanked = await hybridSearch(query, allChunks, allChunks, 0.6);
-    return reRanked
-      .slice(0, topK)
-      .map((match) => ({
-        content: match.content,
-        documentTitle: match.metadata?.documentTitle || '',
-        similarity: match.similarity || 0,
-        bm25Score: match.bm25Score || 0,
-        vectorScore: match.vectorScore || 0,
-      }));
+    return reRanked.slice(0, topK).map((match) => ({
+      content: match.content,
+      documentTitle: match.metadata?.documentTitle || '',
+      similarity: match.similarity || 0,
+      bm25Score: match.bm25Score || 0,
+      vectorScore: match.vectorScore || 0,
+    }));
   }, []);
 
   const captureImage = useCallback(async (file) => {
-    // Read file as base64 data URL — transformers.js can fetch data URLs in workers
     const dataUrl = await new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
       reader.readAsDataURL(file);
     });
     setCapturedImage({ dataUrl, file, name: file.name });
-
-    // Pass the data URL string — the worker pipeline can fetch it natively
     try {
       setProgress({ status: 'analyzing', message: 'Analyzing image...', progress: 20 });
       const result = await ai.captionImage(dataUrl);
@@ -152,7 +152,6 @@ export function useRAG() {
   const clearCapturedImage = useCallback(() => {
     setCapturedImage(null);
   }, []);
-
   const getStats = useCallback(async () => {
     const store = await getStore();
     return store.getStats();
@@ -173,5 +172,7 @@ export function useRAG() {
     clearVectors,
     isProcessing,
     progress,
+    error,
+    setError,
   };
 }

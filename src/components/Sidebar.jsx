@@ -262,7 +262,7 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
               <p className="text-[10px] font-medium px-1 py-2" style={{ color: 'var(--text-muted)' }}>
                 {t(group.toLowerCase().replace(' ', '_'))}
               </p>
-              {items.map((conv) => {
+              {items.map((conv, idx) => {
                 const convResults = searchResults.filter((r) => r.conversationId === conv.id);
                 return (
                   <div key={conv.id}>

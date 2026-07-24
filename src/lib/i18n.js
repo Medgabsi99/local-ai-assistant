@@ -41,7 +41,7 @@ const translations = {
     tokens_est: 'Tokens (est.)',
     export_backup: '⬇ Export Backup',
     import_backup: '⬆ Import Backup',
-    clear_all: '🗑 Clear All Data',
+    clear_all: 'Clear All Data',
     clear_all_confirm:
       '⚠️ This will delete ALL local data including:\n\n• All conversations and messages\n• All uploaded documents\n• All vector embeddings\n• All cached AI models\n\nThis cannot be undone. Are you sure?',
     llm_server: 'Local LLM Server (Ollama)',
@@ -62,7 +62,7 @@ const translations = {
     download_default: 'Download Default',
     active: 'Active',
     downloading: 'Downloading...',
-    memory_warning: '⚠️ Large models require significant memory.',
+    memory_warning: 'Large models require significant memory.',
     no_conv_match: 'No conversations match',
     type_message: 'Type a message...',
     ask_documents: 'Ask about your documents...',

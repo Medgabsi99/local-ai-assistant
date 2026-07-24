@@ -1,9 +1,3 @@
-// ============================================================
-// Multi-Session Persistent Memory
-// Stores facts the AI learns about the user across conversations
-// Memories are automatically injected into the system prompt
-// ============================================================
-
 import Dexie from 'dexie';
 
 const MEMORY_DB_NAME = 'LocalAIMemory';
@@ -18,7 +12,6 @@ class MemoryDB extends Dexie {
 }
 
 let db = null;
-
 function getDb() {
   if (!db) db = new MemoryDB();
   return db;
@@ -26,7 +19,7 @@ function getDb() {
 
 /**
  * Extract potential memory facts from a conversation.
- * Uses precise patterns with negative lookahead to avoid false positives.
+ * Uses precise patterns with negative lookbehind to reject common false positives.
  * @param {string} content - The message content from user
  * @returns {string[]} - Array of memory facts
  */
@@ -34,63 +27,79 @@ export function extractMemories(content) {
   const memories = [];
   const lower = content.toLowerCase();
 
-  // Patterns use negative lookahead to reject negatives and common false matches.
-  // Each requires at least two meaningful words after the signal word.
+  // Each pattern requires the fact to be at least 15 characters total
+  // and uses a negative lookahead blocklist to filter throwaway statements
+
   const patterns = [
-    // "I like X", "I love X", "I prefer X", "I enjoy X", "I hate X", "I dislike X"
-    // Blocked: "I like it", "I like that", "I don't like X"
-    /\bI\s+(?:really\s+)?(?:like|love|prefer|enjoy|hate|dislike)\s+(?!(?:it|that|this|those|them|these|you|him|her)\b)(\w+(?:\s+\w+){0,3})/gi,
+    // "My name is X" — at least 3 chars for the name
+    /\bmy\s+name\s+is\s+(\w{3,}(?:\s+\w+)?)\b/gi,
 
-    // "My favorite X is Y" — captures the whole predicate
-    /\bmy\s+favorite\s+(\w+(?:\s+\w+)?)\s+is\s+(\w+(?:\s+\w+){0,2})/gi,
+    // "I'm X" or "I am X" — but NOT followed by a verb or negation
+    // Blocked: "I am not", "I am just", "I am going", "I am trying", "I am saying",
+    //          "I am asking", "I am wondering", "I am thinking", "I am looking",
+    //          "I am sure", "I am sorry", "I am happy/sad/glad"
+    /\bI\s+(?:'m|am)\s+(?:(?:a|an)\s+)?(?!not\s|just\s|going\s|trying\s|saying\s|asking\s|wondering\s|thinking\s|looking\s|waiting\s|sure\s|sorry\s|happy\s|sad\s|glad\s|tired\s|ready\s|able\s|about\s|here\s|there\s|new\s|still\s|very\s|so\s|too\s)(\w{3,}(?:\s+\w+){0,3})\b/gi,
 
-    // "I am a/an X" or "I'm a/an X" — but NOT "I am not", "I am just", "I am going", "I am sure", "I am saying"
-    /\bI\s+(?:am|'m)\s+(?:(?:a|an)\s+)?(?!(?:not|just|going|sure|saying|trying|thinking|wondering|asking|telling|being|doing|having|making|getting|looking|waiting)\b)(\w+(?:\s+\w+){0,3})/gi,
+    // "I work|study as|at|in|for X" — must be a concrete role/place
+    /\bI\s+(?:work|study)\s+(?:as|at|in|for)\s+(?!(?:a|an|the|this|that|here|there|it)\b)(\w{3,}(?:\s+\w+){0,3})/gi,
 
-    // "I work as X", "I work at X", "I work in X", "I study at X", "I study in X"
-    /\bI\s+(?:work|study)\s+(?:as|at|in|for)\s+(\w+(?:\s+\w+){0,3})/gi,
+    // "I live|reside in X" — must be a place name (at least 3 chars)
+    /\bI\s+(?:live|reside)\s+in\s+(\w{3,}(?:\s+\w+){0,2})\b/gi,
 
-    // "My name is X" (at least 2 chars)
-    /\bmy\s+name\s+is\s+(\w{2,}(?:\s+\w+)?)/gi,
+    // "I like|love|prefer|enjoy X" — but NOT "I like it|that|this|you|him|her|them"
+    /\bI\s+(?:really\s+)?(?:like|love|prefer|enjoy)\s+(?!it\b|that\b|this\b|you\b|him\b|her\b|them\b|those\b|these\b)(\w{3,}(?:\s+\w+){0,3})/gi,
 
-    // "I live in X" (at least 3 chars — city/country names)
-    /\bI\s+(?:live|reside)\s+in\s+(\w{3,}(?:\s+\w+){0,2})/gi,
+    // "I hate|dislike X"
+    /\bI\s+(?:really\s+)?(?:hate|dislike)\s+(?!it\b|that\b|this\b|you\b|him\b|her\b|them\b)(\w{3,}(?:\s+\w+){0,3})/gi,
 
-    // "I have been X for Y years" — captures roles with duration
-    /\bI\s+(?:have\s+been|'ve\s+been)\s+(?:(?:a|an)\s+)?(\w+(?:\s+\w+){0,3})\s+for\b/gi,
+    // "My favorite X is Y"
+    /\bmy\s+favorite\s+(\w{3,}(?:\s+\w+)?)\s+is\s+(\w{3,}(?:\s+\w+){0,2})/gi,
+
+    // "I've been X for" or "I have been X for" — experience/role with duration
+    /\bI\s+(?:have\s+been|'ve\s+been)\s+(?:(?:a|an)\s+)?(?!there\b|here\b|through\b)(\w{3,}(?:\s+\w+){0,3})\s+for\b/gi,
+
+    // "I have X years of experience" — skill/experience
+    /\bI\s+have\s+\d+\s+years?\s+of\s+(?:experience\s+(?:in|with)\s+)?(\w{3,}(?:\s+\w+){0,3})/gi,
   ];
 
   for (const pattern of patterns) {
     let match;
     while ((match = pattern.exec(lower)) !== null) {
       const fact = match[0].trim();
-      // Only store if it looks like a real fact (not a throwaway statement)
-      if (fact.length > 12 && fact.length < 300 && !containsNegation(fact)) {
-        memories.push(fact.charAt(0).toUpperCase() + fact.slice(1));
-      }
+      // Length filter: too short = likely a false positive
+      if (fact.length < 15) continue;
+      // Negation filter: contains a negation word = not a real fact
+      if (
+        /\b(?:don't|doesn't|didn't|won't|wouldn't|can't|couldn't|shouldn't|isn't|aren't|wasn't|weren't|haven't|hasn't|hadn't|never|no\s+longer)\b/i.test(
+          fact,
+        )
+      )
+        continue;
+      // Tense filter: "I am going to" or "I am trying to" = action, not fact
+      if (/\b(?:going|trying|thinking|wondering|asking|telling|hoping|wanting|needing)\s+(?:to|about)\b/i.test(fact))
+        continue;
+      // Time qualifier: "right now", "today" = temporary, not factual
+      if (/\b(?:right now|at the moment|today|this week|this month)\b/i.test(fact)) continue;
+
+      memories.push(fact.charAt(0).toUpperCase() + fact.slice(1));
     }
   }
 
-  return [...new Set(memories)]; // deduplicate
+  return [...new Set(memories)];
 }
 
-/**
- * Check if a matched fact contains negation that would make it not-a-fact.
- */
-function containsNegation(text) {
-  return /\b(?:don't|doesn't|didn't|won't|wouldn't|can't|couldn't|shouldn't|isn't|aren't|wasn't|weren't|haven't|hasn't|hadn't|never|no\s+longer)\b/i.test(
-    text,
-  );
-}
-
-/**
- * Infer a category from memory content
- */
 function inferCategory(content) {
   const lower = content.toLowerCase();
   if (lower.includes('name')) return 'identity';
-  if (lower.includes('work') || lower.includes('study') || lower.includes('job')) return 'work';
-  if (lower.includes('live') || lower.includes('reside') || lower.includes('address')) return 'location';
+  if (lower.includes('live') || lower.includes('reside')) return 'location';
+  if (
+    lower.includes('work') ||
+    lower.includes('study') ||
+    lower.includes('job') ||
+    lower.includes('experience') ||
+    lower.includes('years of')
+  )
+    return 'work';
   if (
     lower.includes('like') ||
     lower.includes('love') ||
@@ -101,19 +110,16 @@ function inferCategory(content) {
     lower.includes('dislike')
   )
     return 'preference';
-  if (lower.includes('am') || lower.includes("'m")) return 'trait';
+  if (lower.includes("'m") || lower.includes(' am ')) return 'trait';
   if (lower.includes('been')) return 'experience';
   return 'general';
 }
 
-/**
- * Save a memory fact to persistent storage
- */
 export async function saveMemory(content) {
-  const db = getDb();
-  const existing = await db.memories.where('content').equals(content).count();
-  if (existing > 0) return; // Deduplicate
-  return db.memories.add({
+  const memDb = getDb();
+  const existing = await memDb.memories.where('content').equals(content).count();
+  if (existing > 0) return;
+  return memDb.memories.add({
     content,
     category: inferCategory(content),
     createdAt: new Date().toISOString(),
@@ -121,46 +127,29 @@ export async function saveMemory(content) {
   });
 }
 
-/**
- * Get all memories, optionally filtered by category
- */
 export async function getMemories(category = null) {
-  const db = getDb();
-  if (category) {
-    return db.memories.where('category').equals(category).toArray();
-  }
-  return db.memories.toArray();
+  const memDb = getDb();
+  if (category) return memDb.memories.where('category').equals(category).toArray();
+  return memDb.memories.toArray();
 }
 
-/**
- * Delete a specific memory by ID
- */
 export async function deleteMemory(id) {
-  const db = getDb();
-  return db.memories.delete(id);
+  const memDb = getDb();
+  return memDb.memories.delete(id);
 }
 
-/**
- * Clear all memories
- */
 export async function clearMemories() {
-  const db = getDb();
-  return db.memories.clear();
+  const memDb = getDb();
+  return memDb.memories.clear();
 }
 
-/**
- * Get memory summary text for injection into system prompt
- */
 export async function getMemorySummary() {
   const memories = await getMemories();
   if (memories.length === 0) return '';
   return memories.map((m) => m.content).join(' ');
 }
 
-/**
- * Get memory count
- */
 export async function getMemoryCount() {
-  const db = getDb();
-  return db.memories.count();
+  const memDb = getDb();
+  return memDb.memories.count();
 }

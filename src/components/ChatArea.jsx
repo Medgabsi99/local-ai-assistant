@@ -581,7 +581,7 @@ export default function ChatArea({ conversationId }) {
               messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
               setShowScrollBtn(false);
             }}
-            className="fixed bottom-20 right-8 z-30 w-10 h-10 flex items-center justify-center rounded-full bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/30 transition-all animate-fade-in"
+            className="interactive fixed bottom-20 right-8 z-30 w-10 h-10 flex items-center justify-center rounded-full bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/30 animate-fade-in"
             aria-label={t('scroll_to_bottom')}
           >
             <svg
