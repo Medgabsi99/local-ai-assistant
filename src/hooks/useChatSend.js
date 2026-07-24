@@ -171,14 +171,36 @@ export function useChatSend({
         });
         setStreamingContent('');
         if (messages.length === 0) {
-          const fallback = userMessage.slice(0, 50) + (userMessage.length > 50 ? '...' : '');
-          const title = fullResponse
-            ? fullResponse
-                .replace(/<[^>]*>/g, '')
-                .slice(0, 50)
-                .trim()
-            : fallback;
-          await updateConversationTitle(conversationId, title || fallback);
+          // Generate a concise title using the LLM
+          let title = '';
+          try {
+            const titlePrompt = `Generate a very short title (max 6 words) for a conversation that starts with this user message and AI response.\n\nUser: ${userMessage.slice(0, 200)}\nAI: ${fullResponse.replace(/<[^>]*>/g, '').slice(0, 200)}\n\nTitle:`;
+            if (serverConfig.enabled) {
+              title = await generate(titlePrompt, { maxTokens: 20, temperature: 0.3 });
+            } else {
+              const result = await ai.runInference({
+                modelName: 'llm',
+                input: titlePrompt,
+                maxTokens: 20,
+                temperature: 0.3,
+              });
+              title = result?.result || '';
+            }
+            title = title.replace(/["']/g, '').trim();
+            if (title.length < 3 || title.length > 60) title = '';
+          } catch {
+            /* title generation failed, use fallback */
+          }
+          if (!title) {
+            const fallback = userMessage.slice(0, 50) + (userMessage.length > 50 ? '...' : '');
+            title = fullResponse
+              ? fullResponse
+                  .replace(/<[^>]*>/g, '')
+                  .slice(0, 50)
+                  .trim()
+              : fallback;
+          }
+          await updateConversationTitle(conversationId, title);
         }
         await loadMessages();
       } catch (error) {
