@@ -53,11 +53,9 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
   const load = async () => {
     setConversations(await getAllConversations());
   };
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     load().catch(() => {});
   }, [activeConversationId]);
-
   useEffect(() => {
     if (renaming) renameRef.current?.select();
   }, [renaming]);
@@ -99,14 +97,12 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
   const handleSearchChange = (e) => {
     const value = e.target.value;
     setSearch(value);
-    // Debounce the full-text search
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout(() => {
       setSearchQuery(value);
     }, 300);
   };
 
-  // Filter conversations: title match OR has search results
   const filtered = conversations.filter((c) => {
     if (showArchived !== !!c.archived) return false;
     if (!search.trim()) return true;
@@ -130,14 +126,14 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
       >
         <button
           onClick={() => setCollapsed(false)}
-          className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-white/5"
+          className="btn-icon text-slate-400 hover:text-white"
           aria-label={t('expand_sidebar')}
         >
           <ChevronRight size={16} />
         </button>
         <button
           onClick={newChat}
-          className="w-10 h-10 flex items-center justify-center rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg"
+          className="w-10 h-10 flex items-center justify-center rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg transition-all active:scale-95"
           aria-label={t('new_chat')}
         >
           <Plus size={16} />
@@ -145,7 +141,7 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
         <div className="flex-1" />
         <button
           onClick={onOpenSettings}
-          className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-white/5"
+          className="btn-icon text-slate-400 hover:text-white"
           aria-label={t('settings')}
         >
           <Settings size={16} />
@@ -159,6 +155,7 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
       className="h-full w-64 flex flex-col flex-shrink-0"
       style={{ background: 'var(--bg-primary)', borderRight: '1px solid var(--border)' }}
     >
+      {/* Header */}
       <div
         className="p-3 flex items-center justify-between flex-shrink-0"
         style={{ borderBottom: '1px solid var(--border)' }}
@@ -166,7 +163,7 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
         <h1 className="font-bold text-sm flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
           <Lock size={14} className="text-emerald-400" /> {t('app_name')}
           {anyLoading && (
-            <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full whitespace-nowrap animate-pulse">
+            <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full animate-pulse">
               ⬇
             </span>
           )}
@@ -174,14 +171,14 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
         <div className="flex items-center gap-0.5">
           <button
             onClick={onOpenSettings}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-white/5"
+            className="btn-icon text-slate-400 hover:text-white"
             aria-label={t('settings')}
           >
             <Settings size={14} />
           </button>
           <button
             onClick={() => setCollapsed(true)}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-white/5"
+            className="btn-icon text-slate-400 hover:text-white"
             aria-label={t('collapse_sidebar')}
           >
             <ChevronLeft size={14} />
@@ -189,6 +186,7 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
         </div>
       </div>
 
+      {/* New Chat Button */}
       <div className="p-3 flex-shrink-0">
         <button
           onClick={newChat}
@@ -199,6 +197,7 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
         </button>
       </div>
 
+      {/* Search + Archive Toggle */}
       <div className="px-3 pb-2 flex-shrink-0">
         <div className="relative">
           <Search
@@ -241,6 +240,7 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
         </button>
       </div>
 
+      {/* Conversation List */}
       <div className="flex-1 min-h-0 overflow-y-auto px-2 space-y-0.5">
         {search.trim() && searchResults.length > 0 && (
           <div className="px-1 py-1.5">
@@ -353,7 +353,6 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
                         </div>
                       )}
                     </div>
-                    {/* Show search result snippets for this conversation */}
                     {search.trim() && convResults.length > 0 && (
                       <div className="ml-4 mt-0.5 space-y-0.5">
                         {convResults.slice(0, 2).map((r) => (
@@ -384,10 +383,12 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
         })}
       </div>
 
+      {/* Model Status */}
       <div className="overflow-y-auto max-h-[260px] flex-shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
         <ModelStatus />
       </div>
 
+      {/* Footer */}
       <div className="p-2 flex-shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
         <p className="text-[10px] text-center" style={{ color: 'var(--text-muted)' }}>
           {t('all_data_device')}
