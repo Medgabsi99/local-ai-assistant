@@ -77,7 +77,11 @@ vi.mock('../hooks/useSettings', () => ({
 }));
 
 vi.mock('../workers/worker-bridge', () => ({
-  ai: { cancelInference: vi.fn(), checkAllModels: vi.fn().mockResolvedValue({ statuses: {} }), getAvailableModels: vi.fn().mockResolvedValue({ models: [] }) },
+  ai: {
+    cancelInference: vi.fn(),
+    checkAllModels: vi.fn().mockResolvedValue({ statuses: {} }),
+    getAvailableModels: vi.fn().mockResolvedValue({ models: [] }),
+  },
 }));
 
 vi.mock('../lib/error-handler', () => ({
@@ -147,7 +151,7 @@ vi.mock('../lib/hybrid-search', () => ({
 import { t } from '../lib/i18n';
 Element.prototype.scrollIntoView = vi.fn();
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 
 describe('Integration: App Shell', () => {
   beforeEach(() => {
@@ -170,6 +174,9 @@ describe('Integration: App Shell', () => {
   it('renders settings modal with language options', async () => {
     const SettingsModal = (await import('../components/SettingsModal')).default;
     render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
+    // Click the Appearance tab to reveal language options
+    const appearanceTab = screen.getByText('appearance');
+    fireEvent.click(appearanceTab);
     expect(screen.getByText(t('language'))).toBeDefined();
   });
 
@@ -200,19 +207,59 @@ describe('Integration: App Shell', () => {
 describe('Integration: i18n Coverage', () => {
   it('all critical UI keys return translated strings', () => {
     const criticalKeys = [
-      'app_name', 'chat', 'documents', 'settings', 'new_chat',
-      'send', 'cancel_label', 'save', 'clear', 'del', 'edit', 'copy',
-      'search_messages', 'type_message', 'ask_documents',
-      'bold', 'italic', 'code', 'link', 'list', 'code_block', 'markdown',
-      'pause', 'stop', 'resume', 'record_cancel', 'transcribing',
-      'error_title', 'error_body', 'reload',
-      'back_online', 'you_are_offline', 'loading',
-      'filter_all', 'filter_user', 'filter_ai',
-      'open_menu', 'close_menu', 'expand_sidebar', 'collapse_sidebar',
-      'previous_match', 'next_match', 'close_search', 'dismiss_error',
-      'scroll_to_bottom', 'stop_generation',
-      'share', 'share_copy', 'share_download',
-      'vectors', 'tags', 'language', 'required',
+      'app_name',
+      'chat',
+      'documents',
+      'settings',
+      'new_chat',
+      'send',
+      'cancel_label',
+      'save',
+      'clear',
+      'del',
+      'edit',
+      'copy',
+      'search_messages',
+      'type_message',
+      'ask_documents',
+      'bold',
+      'italic',
+      'code',
+      'link',
+      'list',
+      'code_block',
+      'markdown',
+      'pause',
+      'stop',
+      'resume',
+      'record_cancel',
+      'transcribing',
+      'error_title',
+      'error_body',
+      'reload',
+      'back_online',
+      'you_are_offline',
+      'loading',
+      'filter_all',
+      'filter_user',
+      'filter_ai',
+      'open_menu',
+      'close_menu',
+      'expand_sidebar',
+      'collapse_sidebar',
+      'previous_match',
+      'next_match',
+      'close_search',
+      'dismiss_error',
+      'scroll_to_bottom',
+      'stop_generation',
+      'share',
+      'share_copy',
+      'share_download',
+      'vectors',
+      'tags',
+      'language',
+      'required',
     ];
     for (const key of criticalKeys) {
       const result = t(key);
