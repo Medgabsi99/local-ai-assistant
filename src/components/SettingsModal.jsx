@@ -78,25 +78,16 @@ export default function SettingsModal({ isOpen, onClose }) {
     if (!confirm(t('clear_all_confirm'))) return;
     setClearing(true);
     try {
-      // Terminate all workers first to release IndexedDB connections
       const { terminateAll } = await import('../workers/worker-bridge');
       terminateAll();
-      // Reset vector store promise so it re-creates on next access
       resetVectorStore();
-      // Close the main dexie connection
       await db.close();
-      // Delete known IndexedDB databases by name
       const knownDatabases = ['LocalAIDB', 'LocalAIVectors', 'LocalAIMemory'];
-      for (const name of knownDatabases) {
-        indexedDB.deleteDatabase(name);
-      }
-      // Clear service worker caches
+      for (const name of knownDatabases) indexedDB.deleteDatabase(name);
       const cacheKeys = await caches.keys();
       for (const key of cacheKeys) await caches.delete(key);
-      // Unload AI models
       await ai.unloadAll();
       toast?.(t('data_cleared'), 'success');
-      // Force reload — this creates fresh DBs from scratch
       window.location.reload();
     } catch (error) {
       console.error(error);
@@ -106,7 +97,6 @@ export default function SettingsModal({ isOpen, onClose }) {
   };
 
   const handleExportData = async () => {
-    // Rate limiting — max 3 exports per minute
     if (!exportRateLimiter.canCall('export')) {
       toast?.('Rate limited: too many export requests. Please wait.', 'error');
       return;
@@ -176,21 +166,46 @@ export default function SettingsModal({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
+  const accentStyle = (name) =>
+    ({
+      emerald: '#10b981',
+      blue: '#3b82f6',
+      violet: '#8b5cf6',
+      amber: '#f59e0b',
+      rose: '#f43f5e',
+      cyan: '#06b6d4',
+    })[name];
+
+  const Btn = ({ onClick, disabled, children, danger }) => (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`w-full px-4 py-2.5 rounded-xl text-sm transition-all duration-200 text-left disabled:opacity-50 active:scale-[0.98] ${danger ? 'border border-red-800/50 text-red-400 hover:bg-red-600/20' : 'text-slate-200 hover:bg-white/5'}`}
+      style={{ background: danger ? 'rgba(239,68,68,0.1)' : 'var(--bg-hover)' }}
+    >
+      {children}
+    </button>
+  );
+
   return (
     <>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex items-center justify-center modal-overlay animate-fade-in"
         role="dialog"
         aria-modal="true"
         aria-label={t('settings')}
+        onClick={onClose}
       >
-        <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md max-h-[80vh] overflow-y-auto p-6 shadow-2xl">
+        <div
+          className="card w-full max-w-md max-h-[80vh] overflow-y-auto p-6 shadow-2xl animate-scale-in"
+          onClick={(e) => e.stopPropagation()}
+          style={{ background: 'var(--bg-card)' }}
+        >
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-white">{t('settings')}</h2>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"
-            >
+            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
+              {t('settings')}
+            </h2>
+            <button onClick={onClose} className="btn-icon text-slate-400 hover:text-white" aria-label={t('close')}>
               ✕
             </button>
           </div>
@@ -198,8 +213,11 @@ export default function SettingsModal({ isOpen, onClose }) {
           <div className="space-y-6">
             {/* Stats */}
             <div>
-              <h3 className="text-sm font-medium text-slate-300 mb-3">
-                <BarChart3 size={16} className="inline mr-1" />
+              <h3
+                className="text-xs font-semibold uppercase tracking-wider mb-3"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <BarChart3 size={14} className="inline mr-1.5" />
                 {t('statistics')}
               </h3>
               <div className="grid grid-cols-2 gap-2">
@@ -209,9 +227,17 @@ export default function SettingsModal({ isOpen, onClose }) {
                   { label: t('tokens_est'), value: stats.totalTokens.toLocaleString() },
                   { label: t('documents'), value: stats.totalDocuments },
                 ].map((s) => (
-                  <div key={s.label} className="bg-slate-900 rounded-xl p-3 text-center">
-                    <p className="text-lg font-bold text-white">{s.value}</p>
-                    <p className="text-[10px] text-slate-500 mt-0.5">{s.label}</p>
+                  <div
+                    key={s.label}
+                    className="rounded-xl p-3 text-center"
+                    style={{ background: 'var(--bg-secondary)' }}
+                  >
+                    <p className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
+                      {s.value}
+                    </p>
+                    <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                      {s.label}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -219,18 +245,19 @@ export default function SettingsModal({ isOpen, onClose }) {
 
             {/* Language */}
             <div>
-              <h3 className="text-sm font-medium text-slate-300 mb-3">
-                <Globe size={16} className="inline mr-1" />
+              <h3
+                className="text-xs font-semibold uppercase tracking-wider mb-3"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <Globe size={14} className="inline mr-1.5" />
                 {t('language')}
               </h3>
               <div className="flex gap-2">
                 {getLanguages().map((lang) => (
                   <button
                     key={lang}
-                    onClick={() => {
-                      switchLang(lang);
-                    }}
-                    className={`px-3 py-1.5 text-xs rounded-md font-medium transition-all ${getLanguage() === lang ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40' : ''}`}
+                    onClick={() => switchLang(lang)}
+                    className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-all ${getLanguage() === lang ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40' : ''}`}
                     style={{
                       background: getLanguage() === lang ? undefined : 'var(--bg-hover)',
                       color: getLanguage() === lang ? undefined : 'var(--text-secondary)',
@@ -244,168 +271,171 @@ export default function SettingsModal({ isOpen, onClose }) {
 
             {/* Accent */}
             <div>
-              <h3 className="text-sm font-medium text-slate-300 mb-3">
-                <Palette size={16} className="inline mr-1" />
+              <h3
+                className="text-xs font-semibold uppercase tracking-wider mb-3"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <Palette size={14} className="inline mr-1.5" />
                 {t('accent_color')}
               </h3>
               <div className="flex gap-2">
-                {ACCENT_COLORS.map((name) => {
-                  const colorMap = {
-                    emerald: '#10b981',
-                    blue: '#3b82f6',
-                    violet: '#8b5cf6',
-                    amber: '#f59e0b',
-                    rose: '#f43f5e',
-                    cyan: '#06b6d4',
-                  };
-                  return (
-                    <button
-                      key={name}
-                      onClick={async () => {
-                        document.documentElement.setAttribute('data-accent', name);
-                        await setSetting('accent', name);
-                      }}
-                      className="w-8 h-8 rounded-full transition-all duration-200 hover:scale-110 active:scale-95"
-                      style={{ backgroundColor: colorMap[name] }}
-                      title={name}
-                    />
-                  );
-                })}
+                {ACCENT_COLORS.map((name) => (
+                  <button
+                    key={name}
+                    onClick={async () => {
+                      document.documentElement.setAttribute('data-accent', name);
+                      await setSetting('accent', name);
+                    }}
+                    className="w-8 h-8 rounded-full transition-all duration-200 hover:scale-110 active:scale-95 ring-2 ring-transparent hover:ring-white/20"
+                    style={{ backgroundColor: accentStyle(name) }}
+                    title={name}
+                  />
+                ))}
               </div>
             </div>
 
             {/* Storage */}
             <div>
-              <h3 className="text-sm font-medium text-slate-300 mb-3">{t('storage')}</h3>
+              <h3
+                className="text-xs font-semibold uppercase tracking-wider mb-3"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                {t('storage')}
+              </h3>
               {storageEstimate ? (
-                <div className="bg-slate-900 rounded-xl p-4">
+                <div className="rounded-xl p-4" style={{ background: 'var(--bg-secondary)' }}>
                   <div className="flex justify-between mb-2">
-                    <span className="text-sm text-slate-400">{t('storage')}</span>
-                    <span className="text-sm text-slate-200">{formatBytes(storageEstimate.usage)}</span>
+                    <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                      {t('storage')}
+                    </span>
+                    <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                      {formatBytes(storageEstimate.usage)}
+                    </span>
                   </div>
-                  <div className="w-full bg-slate-700 rounded-full h-2 mb-2">
+                  <div className="w-full h-2 rounded-full mb-2" style={{ background: 'var(--border)' }}>
                     <div
                       className="bg-emerald-500 h-2 rounded-full transition-all"
                       style={{ width: `${storageEstimate.percentUsed}%` }}
                     />
                   </div>
-                  <div className="flex justify-between text-xs text-slate-500">
+                  <div className="flex justify-between text-xs" style={{ color: 'var(--text-muted)' }}>
                     <span>{storageEstimate.percentUsed}%</span>
                     <span>{formatBytes(storageEstimate.quota)}</span>
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-slate-500">{t('storage')}</p>
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                  {t('storage')}
+                </p>
               )}
             </div>
 
             {/* Actions */}
-            <div className="space-y-3">
-              <button
-                onClick={handleExportData}
-                disabled={transferring}
-                className="w-full px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm transition-colors text-left disabled:opacity-50"
-              >
+            <div className="space-y-2">
+              <Btn onClick={handleExportData} disabled={transferring}>
                 {transferring ? t('processing') : t('export_backup')}
-              </button>
-              <button
-                onClick={openImportDialog}
-                disabled={transferring}
-                className="w-full px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm transition-colors text-left disabled:opacity-50"
-              >
+              </Btn>
+              <Btn onClick={openImportDialog} disabled={transferring}>
                 {t('import_backup')}
-              </button>
-              <button
-                onClick={() => setShowVectorManager(true)}
-                className="w-full px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm transition-colors text-left"
-              >
-                {t('vectors')}
-              </button>
-              <button
-                onClick={() => setShowMemoryPanel(true)}
-                className="w-full px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm transition-colors text-left"
-              >
-                🧠 {t('memory')}
-              </button>
-              <button
-                onClick={handleClearAllData}
-                disabled={clearing}
-                className="w-full px-4 py-2.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-sm transition-colors border border-red-800/50 disabled:opacity-50"
-              >
+              </Btn>
+              <Btn onClick={() => setShowVectorManager(true)}>{t('vectors')}</Btn>
+              <Btn onClick={() => setShowMemoryPanel(true)}>🧠 {t('memory')}</Btn>
+              <Btn onClick={handleClearAllData} disabled={clearing} danger>
                 {clearing ? t('processing') : t('clear_all')}
-              </button>
+              </Btn>
+            </div>
 
-              {/* LLM Server */}
-              <div className="border-t border-slate-700 pt-3 mt-3">
-                <p className="text-xs font-medium text-slate-400 mb-2">
-                  <Server size={14} className="inline mr-1" />
-                  {t('llm_server')}
-                </p>
-                <input
-                  type="text"
-                  value={serverCfg.baseUrl}
-                  onChange={(e) => {
-                    const n = { ...serverCfg, baseUrl: e.target.value };
-                    setServerCfg(n);
-                    setServerConfig(n);
+            {/* LLM Server */}
+            <div className="pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+              <h3
+                className="text-xs font-semibold uppercase tracking-wider mb-3"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <Server size={14} className="inline mr-1.5" />
+                {t('llm_server')}
+              </h3>
+              <input
+                type="text"
+                value={serverCfg.baseUrl}
+                onChange={(e) => {
+                  const n = { ...serverCfg, baseUrl: e.target.value };
+                  setServerCfg(n);
+                  setServerConfig(n);
+                }}
+                placeholder="http://localhost:11434"
+                className="w-full rounded-xl border px-3 py-2 text-sm outline-none focus:border-emerald-500/50 transition-colors mb-2"
+                style={{
+                  background: 'var(--bg-secondary)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--text-primary)',
+                }}
+              />
+              <input
+                type="text"
+                value={serverCfg.model}
+                onChange={(e) => {
+                  const n = { ...serverCfg, model: e.target.value };
+                  setServerCfg(n);
+                  setServerConfig(n);
+                }}
+                placeholder="llama3.2:1b"
+                className="w-full rounded-xl border px-3 py-2 text-sm outline-none focus:border-emerald-500/50 transition-colors mb-2"
+                style={{
+                  background: 'var(--bg-secondary)',
+                  borderColor: 'var(--border)',
+                  color: 'var(--text-primary)',
+                }}
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={async () => {
+                    setSrvStatus({ checking: true });
+                    const r = await checkServer();
+                    setSrvStatus({ checking: false, result: r });
                   }}
-                  placeholder="http://localhost:11434"
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none focus:border-emerald-500 mb-2"
-                />
-                <input
-                  type="text"
-                  value={serverCfg.model}
-                  onChange={(e) => {
-                    const n = { ...serverCfg, model: e.target.value };
-                    setServerCfg(n);
-                    setServerConfig(n);
-                  }}
-                  placeholder="llama3.2:1b"
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none focus:border-emerald-500 mb-2"
-                />
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={async () => {
-                      setSrvStatus({ checking: true });
-                      const r = await checkServer();
-                      setSrvStatus({ checking: false, result: r });
+                  disabled={srvStatus.checking}
+                  className="px-3 py-1.5 text-xs rounded-lg font-medium transition-all disabled:opacity-50"
+                  style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
+                >
+                  {srvStatus.checking ? t('testing') : t('test_connection')}
+                </button>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={serverCfg.enabled}
+                    onChange={(e) => {
+                      const n = { ...serverCfg, enabled: e.target.checked };
+                      setServerCfg(n);
+                      setServerConfig(n);
                     }}
-                    disabled={srvStatus.checking}
-                    className="px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-md disabled:opacity-50"
-                  >
-                    {srvStatus.checking ? t('testing') : t('test_connection')}
-                  </button>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={serverCfg.enabled}
-                      onChange={(e) => {
-                        const n = { ...serverCfg, enabled: e.target.checked };
-                        setServerCfg(n);
-                        setServerConfig(n);
-                      }}
-                      className="w-4 h-4 rounded border-slate-600"
-                    />
-                    <span className="text-xs text-slate-400">{t('server_enabled')}</span>
-                  </label>
-                </div>
-                {srvStatus.result && (
-                  <div
-                    className={`text-xs p-2 mt-2 rounded ${srvStatus.result.available ? 'bg-emerald-900/30 text-emerald-400' : 'bg-red-900/30 text-red-400'}`}
-                  >
-                    {srvStatus.result.available ? t('connected') : t('not_connected')}
-                  </div>
-                )}
+                    className="w-4 h-4 rounded"
+                    style={{ accentColor: 'var(--accent)' }}
+                  />
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    {t('server_enabled')}
+                  </span>
+                </label>
               </div>
+              {srvStatus.result && (
+                <div
+                  className={`text-xs p-2 mt-2 rounded-lg ${srvStatus.result.available ? 'text-emerald-400' : 'text-red-400'}`}
+                  style={{ background: srvStatus.result.available ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)' }}
+                >
+                  {srvStatus.result.available ? t('connected') : t('not_connected')}
+                </div>
+              )}
             </div>
 
             {/* Keyboard shortcuts */}
-            <div className="bg-slate-900 rounded-xl p-4 text-xs text-slate-500 space-y-1">
-              <p className="text-slate-400 font-medium">{t('settings')}</p>
-              <p>⌘1: {t('chat')}</p>
-              <p>⌘2: {t('documents')}</p>
-              <p>⌘N: {t('new_chat')}</p>
-              <p>⌘,: {t('settings')}</p>
+            <div className="rounded-xl p-4 text-xs space-y-1" style={{ background: 'var(--bg-secondary)' }}>
+              <p className="font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+                {t('settings')}
+              </p>
+              {['⌘1: Chat', '⌘2: Documents', '⌘N: New Chat', '⌘,: Settings'].map((s) => (
+                <p key={s} style={{ color: 'var(--text-muted)' }}>
+                  {s}
+                </p>
+              ))}
             </div>
           </div>
         </div>
