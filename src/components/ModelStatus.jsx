@@ -98,7 +98,7 @@ export default function ModelStatus() {
     { key: 'embedding', label: t('model_embedding'), icon: '🧬', size: '~80MB', required: true },
     { key: 'llm', label: t('model_language'), icon: '🧠', size: modelStates.llm?.size || '~1.5GB', required: true },
     { key: 'whisper', label: t('model_whisper'), icon: '🎤', size: '~150MB', required: false },
-    { key: 'vision', label: 'Image Understanding', icon: '📷', size: '~600MB', required: false },
+    { key: 'vision', label: t('image_understanding'), icon: '📷', size: '~600MB', required: false },
   ];
 
   return (

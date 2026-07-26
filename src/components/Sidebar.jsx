@@ -12,6 +12,7 @@ import {
 } from '../db/database';
 import { useConversationSearch } from '../hooks/useConversationSearch';
 import ModelStatus from './ModelStatus';
+import ConfirmModal from './ConfirmModal';
 import {
   Lock,
   Plus,
@@ -44,6 +45,8 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
   const [showArchived, setShowArchived] = useState(false);
   const [renaming, setRenaming] = useState(null);
   const [renameVal, setRenameVal] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const { anyLoading } = useModelStatus();
   const renameRef = useRef(null);
   const searchTimeoutRef = useRef(null);
@@ -65,11 +68,18 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
     await load();
     onNewConversation(id);
   };
-  const del = async (e, id) => {
+  const promptDelete = (e, id) => {
     e.stopPropagation();
-    await deleteConversation(id);
+    setDeleteTarget(id);
+    setShowDeleteConfirm(true);
+  };
+
+  const doDelete = async () => {
+    if (!deleteTarget) return;
+    await deleteConversation(deleteTarget);
     await load();
-    if (activeConversationId === id) onNewConversation(null);
+    if (activeConversationId === deleteTarget) onNewConversation(null);
+    setDeleteTarget(null);
   };
   const togglePin = async (e, id, pinned) => {
     e.stopPropagation();
@@ -344,7 +354,7 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
                             <Archive size={10} />
                           </button>
                           <button
-                            onClick={(e) => del(e, conv.id)}
+                            onClick={(e) => promptDelete(e, conv.id)}
                             className="w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-red-400 hover:bg-white/5"
                             aria-label={t('del')}
                           >
@@ -394,6 +404,15 @@ export default function Sidebar({ activeConversationId, onSelectConversation, on
           {t('all_data_device')}
         </p>
       </div>
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={doDelete}
+        title={t('del')}
+        message={t('delete_conversation_confirm')}
+        confirmText={t('del')}
+        danger
+      />
     </div>
   );
 }

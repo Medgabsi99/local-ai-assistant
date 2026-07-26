@@ -75,7 +75,7 @@ export default function ChatTopBar({
           label={t('web_search')}
         />
         <ToggleBtn onClick={() => setShowSearch(!showSearch)} icon={Search} label={t('search')} />
-        <ToggleBtn onClick={toggleTheme} icon={theme === 'dark' ? Sun : Moon} label="Toggle theme" />
+        <ToggleBtn onClick={toggleTheme} icon={theme === 'dark' ? Sun : Moon} label={t('toggle_theme')} />
         <ToggleBtn active={agentMode} onClick={() => setAgentMode(!agentMode)} icon={Bot} label={t('agent_mode')} />
         <ToggleBtn
           onClick={() => setShowTemplates(!showTemplates)}
@@ -87,8 +87,8 @@ export default function ChatTopBar({
           active={smartRepliesEnabled}
           onClick={() => setSmartRepliesEnabled(!smartRepliesEnabled)}
           icon={Lightbulb}
-          label="Smart replies"
-          title="Smart replies (doubles inference per turn)"
+          label={t('smart_replies')}
+          title={t('smart_replies_desc')}
         />
         {messages.length > 1 && (
           <button

@@ -22,20 +22,23 @@ import {
 } from 'lucide-react';
 import VectorStoreManager from './VectorStoreManager';
 import MemoryPanel from './MemoryPanel';
-
-const TABS = [
-  { id: 'stats', label: t('statistics'), icon: BarChart3 },
-  { id: 'appearance', label: t('appearance'), icon: Palette },
-  { id: 'data', label: t('data_management'), icon: Database },
-  { id: 'server', label: 'LLM Server', icon: Server },
-];
+import ConfirmModal from './ConfirmModal';
 
 export default function SettingsModal({ isOpen, onClose }) {
+  const TABS = [
+    { id: 'stats', label: t('statistics'), icon: BarChart3 },
+    { id: 'appearance', label: t('appearance'), icon: Palette },
+    { id: 'data', label: t('data_management'), icon: Database },
+    { id: 'server', label: t('llm_server'), icon: Server },
+  ];
   const [activeTab, setActiveTab] = useState('stats');
   const [storageEstimate, setStorageEstimate] = useState(null);
   const [showVectorManager, setShowVectorManager] = useState(false);
   const [showMemoryPanel, setShowMemoryPanel] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showImportConfirm, setShowImportConfirm] = useState(false);
+  const [importPayload, setImportPayload] = useState(null);
   const [transferring, setTransferring] = useState(false);
   const importInputRef = useRef(null);
   const [serverCfg, setServerCfg] = useState(getServerConfig());
@@ -94,8 +97,11 @@ export default function SettingsModal({ isOpen, onClose }) {
     }
   }, [isOpen]);
 
-  const handleClearAllData = async () => {
-    if (!confirm(t('clear_all_confirm'))) return;
+  const handleClearAllData = () => {
+    setShowClearConfirm(true);
+  };
+
+  const doClearAllData = async () => {
     setClearing(true);
     try {
       const { terminateAll } = await import('../workers/worker-bridge');
@@ -118,7 +124,7 @@ export default function SettingsModal({ isOpen, onClose }) {
 
   const handleExportData = async () => {
     if (!exportRateLimiter.canCall('export')) {
-      toast?.('Rate limited: too many requests', 'error');
+      toast?.(t('rate_limited'), 'error');
       return;
     }
     setTransferring(true);
@@ -157,15 +163,20 @@ export default function SettingsModal({ isOpen, onClose }) {
       toast?.(t('invalid_json'), 'error');
       return;
     }
-    if (!confirm(t('replace_all_data'))) return;
+    setImportPayload(payload);
+    setShowImportConfirm(true);
+  };
+
+  const doImport = async () => {
+    if (!importPayload) return;
     setTransferring(true);
     try {
       const store = await getVectorStore();
       await db.delete();
       await db.open();
-      await importAppData(payload);
+      await importAppData(importPayload);
       await store.clear();
-      await store.importData(payload.vectorStore || {});
+      await store.importData(importPayload.vectorStore || {});
       toast?.(t('data_imported'), 'success');
       window.location.reload();
     } catch (error) {
@@ -273,7 +284,7 @@ export default function SettingsModal({ isOpen, onClose }) {
                   {t('statistics')}
                 </h3>
                 <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
-                  Your local usage overview
+                  {t('statistics_desc')}
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   {[
@@ -323,7 +334,7 @@ export default function SettingsModal({ isOpen, onClose }) {
                       />
                     </div>
                     <p className="text-[11px] mt-2" style={{ color: 'var(--text-muted)' }}>
-                      {storageEstimate.percentUsed}% used
+                      {t('percent_used', { n: storageEstimate.percentUsed })}
                     </p>
                   </div>
                 ) : (
@@ -337,7 +348,7 @@ export default function SettingsModal({ isOpen, onClose }) {
               </div>
               <div className="rounded-xl p-4" style={{ background: 'var(--bg-secondary)' }}>
                 <p className="text-xs font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
-                  Shortcuts
+                  {t('shortcuts')}
                 </p>
                 <div className="space-y-1.5">
                   {[
@@ -376,7 +387,7 @@ export default function SettingsModal({ isOpen, onClose }) {
                   {t('language')}
                 </h3>
                 <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
-                  Choose your interface language
+                  {t('appearance_desc')}
                 </p>
                 <div className="flex gap-2">
                   {getLanguages().map((lang) => (
@@ -403,7 +414,7 @@ export default function SettingsModal({ isOpen, onClose }) {
                   {t('accent_color')}
                 </h3>
                 <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
-                  Personalize your experience
+                  {t('personalise_desc')}
                 </p>
                 <div className="flex gap-3">
                   {ACCENT_COLORS.map((name) => (
@@ -419,7 +430,7 @@ export default function SettingsModal({ isOpen, onClose }) {
                         ringColor: 'transparent',
                         '--tw-ring-offset-color': 'var(--bg-primary)',
                       }}
-                      title={name}
+                      title={t('color_' + name)}
                     />
                   ))}
                 </div>
@@ -436,7 +447,7 @@ export default function SettingsModal({ isOpen, onClose }) {
                   {t('data_management')}
                 </h3>
                 <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
-                  Export, import, and manage your local data
+                  {t('data_management_desc')}
                 </p>
                 <div className="space-y-2">
                   <ActionBtn
@@ -473,13 +484,13 @@ export default function SettingsModal({ isOpen, onClose }) {
                 {t('llm_server')}
               </h3>
               <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
-                Connect to Ollama, LM Studio, or any OpenAI-compatible API
+                {t('server_desc')}
               </p>
 
               <div className="space-y-3">
                 <div>
                   <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>
-                    Server URL
+                    {t('server_url')}
                   </label>
                   <input
                     type="text"
@@ -500,7 +511,7 @@ export default function SettingsModal({ isOpen, onClose }) {
                 </div>
                 <div>
                   <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>
-                    Model Name
+                    {t('model_name')}
                   </label>
                   <input
                     type="text"
@@ -556,7 +567,7 @@ export default function SettingsModal({ isOpen, onClose }) {
                   className="w-full px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 active:scale-[0.98] disabled:opacity-50"
                   style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
                 >
-                  {srvStatus.checking ? 'Testing connection...' : t('test_connection')}
+                  {srvStatus.checking ? t('testing_connection') : t('test_connection')}
                 </button>
                 {srvStatus.result && (
                   <div
@@ -585,6 +596,23 @@ export default function SettingsModal({ isOpen, onClose }) {
       />
       <VectorStoreManager isOpen={showVectorManager} onClose={() => setShowVectorManager(false)} />
       <MemoryPanel isOpen={showMemoryPanel} onClose={() => setShowMemoryPanel(false)} />
+      <ConfirmModal
+        isOpen={showClearConfirm}
+        onClose={() => setShowClearConfirm(false)}
+        onConfirm={doClearAllData}
+        title={t('clear_all')}
+        message={t('clear_all_confirm')}
+        confirmText={t('clear_all')}
+        danger
+      />
+      <ConfirmModal
+        isOpen={showImportConfirm}
+        onClose={() => setShowImportConfirm(false)}
+        onConfirm={doImport}
+        title={t('import_backup')}
+        message={t('replace_all_data')}
+        confirmText={t('import_backup')}
+      />
     </div>
   );
 }

@@ -175,7 +175,7 @@ describe('Integration: App Shell', () => {
     const SettingsModal = (await import('../components/SettingsModal')).default;
     render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
     // Click the Appearance tab to reveal language options
-    const appearanceTab = screen.getByText('appearance');
+    const appearanceTab = screen.getByText(t('appearance'));
     fireEvent.click(appearanceTab);
     expect(screen.getByText(t('language'))).toBeDefined();
   });

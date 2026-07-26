@@ -1,12 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getAllDocuments } from '../db/database';
 import { getVectorStore } from '../lib/vector-store-access';
+import { t } from '../lib/i18n';
+import { X, Trash2, Database, Brain, HardDrive } from 'lucide-react';
+import ConfirmModal from './ConfirmModal';
 
 export default function VectorStoreManager({ isOpen, onClose }) {
   const [stats, setStats] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -14,7 +18,6 @@ export default function VectorStoreManager({ isOpen, onClose }) {
       const store = await getVectorStore();
       const storeStats = await store.getStats();
       setStats(storeStats);
-
       const docs = await getAllDocuments();
       setDocuments(docs);
     } catch (error) {
@@ -25,23 +28,16 @@ export default function VectorStoreManager({ isOpen, onClose }) {
 
   useEffect(() => {
     if (isOpen) {
-      const timer = window.setTimeout(() => {
-        void loadData();
-      }, 0);
-
+      const timer = window.setTimeout(() => { void loadData(); }, 0);
       return () => window.clearTimeout(timer);
     }
   }, [isOpen, loadData]);
 
   const handleClearVectors = async () => {
-    if (
-      !confirm(
-        'Are you sure? This will remove all vector embeddings. Documents will remain, but RAG search will stop working until you re-upload files.',
-      )
-    ) {
-      return;
-    }
+    setShowConfirm(true);
+  };
 
+  const doClearVectors = async () => {
     setClearing(true);
     try {
       const store = await getVectorStore();
@@ -54,8 +50,7 @@ export default function VectorStoreManager({ isOpen, onClose }) {
   };
 
   const estimateStorageSize = () => {
-    if (!stats || stats.totalVectors === 0) return '0 KB';
-    // Each float32 is 4 bytes, each vector is ~384 dimensions
+    if (!stats || stats.totalVectors === 0) return `0 ${t('kb')}`;
     const bytesPerVector = stats.dimension * 4;
     const totalBytes = stats.totalVectors * bytesPerVector;
     return formatBytes(totalBytes);
@@ -64,107 +59,96 @@ export default function VectorStoreManager({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-lg p-6 shadow-2xl">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-white">Vector Store Manager</h2>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
+    <>
+    <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay animate-fade-in" onClick={onClose}>
+      <div className="card w-full max-w-lg p-5 shadow-2xl animate-scale-in" onClick={(e) => e.stopPropagation()} style={{ background: 'var(--bg-card)' }}>
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+            <Database size={16} style={{ color: 'var(--accent)' }} /> {t('vectors')}
+          </h2>
+          <button onClick={onClose} className="btn-icon text-slate-400 hover:text-white" aria-label={t('close')}>
+            <X size={14} />
           </button>
         </div>
 
         {loading ? (
-          <div className="text-center py-8">
-            <span className="animate-spin text-2xl">⏳</span>
-            <p className="text-slate-400 text-sm mt-2">Loading...</p>
+          <div className="flex items-center justify-center py-12">
+            <div className="w-5 h-5 rounded-full border-2 animate-spin" style={{ borderColor: 'var(--border)', borderTopColor: 'var(--accent)' }} />
           </div>
         ) : (
-          <div className="space-y-6">
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-4">
-              <StatCard label="Total Vectors" value={stats?.totalVectors || 0} icon="🧬" />
-              <StatCard label="Documents" value={stats?.totalDocuments || 0} icon="📄" />
-              <StatCard label="Dimensions" value={stats?.dimension || 384} icon="📐" />
+          <div className="space-y-5">
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: t('vectors'), value: stats?.totalVectors || 0, icon: '🧬' },
+                { label: t('documents'), value: stats?.totalDocuments || 0, icon: '📄' },
+                { label: t('dimensions'), value: stats?.dimension || 384, icon: '📐' },
+              ].map(({ label, value, icon }) => (
+                <div key={label} className="rounded-xl p-3 text-center" style={{ background: 'var(--bg-secondary)' }}>
+                  <span className="text-lg">{icon}</span>
+                  <p className="text-lg font-bold mt-1" style={{ color: 'var(--text-primary)' }}>{value}</p>
+                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{label}</p>
+                </div>
+              ))}
             </div>
 
-            {/* Storage estimate */}
-            <div className="bg-slate-900 rounded-xl p-4">
+            <div className="rounded-xl p-4" style={{ background: 'var(--bg-secondary)' }}>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-slate-400">Estimated Storage</span>
-                <span className="text-sm font-mono text-emerald-400">{estimateStorageSize()}</span>
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  <HardDrive size={12} className="inline mr-1" />{t('storage')}
+                </span>
+                <span className="text-xs font-mono" style={{ color: 'var(--accent)' }}>{estimateStorageSize()}</span>
               </div>
-              <div className="w-full bg-slate-700 rounded-full h-2">
-                <div
-                  className="bg-emerald-500 h-2 rounded-full"
-                  style={{
-                    width: `${Math.min(100, (stats?.totalVectors || 0) / 100)}%`,
-                  }}
-                />
+              <div className="w-full h-1.5 rounded-full" style={{ background: 'var(--border)' }}>
+                <div className="h-1.5 rounded-full" style={{ width: `${Math.min(100, (stats?.totalVectors || 0) / 100)}%`, background: 'var(--accent)' }} />
               </div>
-              <p className="text-xs text-slate-500 mt-2">Stored in Origin Private File System (OPFS)</p>
+              <p className="text-[10px] mt-2" style={{ color: 'var(--text-muted)' }}>{t('opfs_storage')}</p>
             </div>
 
-            {/* Document List */}
             {documents.length > 0 && (
               <div>
-                <h3 className="text-sm font-medium text-slate-300 mb-2">Indexed Documents</h3>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
+                <h3 className="text-xs font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>{t('indexed_documents')}</h3>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto">
                   {documents.map((doc) => (
-                    <div key={doc.id} className="flex items-center justify-between bg-slate-900 rounded-lg px-3 py-2">
-                      <div className="flex items-center gap-2">
+                    <div key={doc.id} className="flex items-center justify-between rounded-xl px-3 py-2" style={{ background: 'var(--bg-secondary)' }}>
+                      <div className="flex items-center gap-2 min-w-0">
                         <span>{doc.fileType === 'application/pdf' ? '📕' : '📄'}</span>
-                        <span className="text-sm text-slate-300 truncate max-w-50">{doc.title}</span>
+                        <span className="text-xs truncate" style={{ color: 'var(--text-primary)' }}>{doc.title}</span>
                       </div>
-                      <span className="text-xs text-slate-500">{(doc.content?.length / 1000).toFixed(1)} KB</span>
+                      <span className="text-[10px] shrink-0" style={{ color: 'var(--text-muted)' }}>{(doc.content?.length / 1000).toFixed(1)} {t('kb')}</span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Actions */}
             <div className="flex gap-3">
-              <button
-                onClick={handleClearVectors}
-                disabled={clearing || !stats?.totalVectors}
-                className="flex-1 px-4 py-2 bg-red-600/20 hover:bg-red-600/30 disabled:opacity-50
-                         text-red-400 rounded-lg text-sm transition-colors border border-red-800/50"
-              >
-                {clearing ? 'Clearing...' : 'Clear All Vectors'}
+              <button onClick={handleClearVectors} disabled={clearing || !stats?.totalVectors}
+                className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-medium transition-all disabled:opacity-50 active:scale-[0.98]"
+                style={{ background: 'rgba(239,68,68,0.08)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}>
+                <Trash2 size={12} /> {clearing ? t('clearing') : t('clear_vectors')}
               </button>
-              <button
-                onClick={onClose}
-                className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 
-                         text-slate-300 rounded-lg text-sm transition-colors"
-              >
-                Close
+              <button onClick={onClose}
+                className="flex-1 px-4 py-2.5 rounded-xl text-xs font-medium transition-all active:scale-[0.98]"
+                style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
+                {t('close')}
               </button>
             </div>
 
-            <p className="text-xs text-slate-500 text-center">
-              Clearing vectors only removes embeddings. Your documents stay intact. Re-upload files to regenerate
-              vectors.
-            </p>
+            <p className="text-[10px] text-center" style={{ color: 'var(--text-muted)' }}>{t('clear_vectors_desc')}</p>
           </div>
         )}
       </div>
     </div>
-  );
-}
-
-function StatCard({ label, value, icon }) {
-  return (
-    <div className="bg-slate-900 rounded-xl p-3 text-center">
-      <span className="text-2xl">{icon}</span>
-      <p className="text-2xl font-bold text-white mt-1">{value}</p>
-      <p className="text-xs text-slate-500">{label}</p>
-    </div>
+      <ConfirmModal
+        isOpen={showConfirm}
+        onClose={() => setShowConfirm(false)}
+        onConfirm={doClearVectors}
+        title={t('clear_vectors')}
+        message={t('clear_vectors_confirm')}
+        confirmText={t('clear_vectors')}
+        danger
+      />
+    </>
   );
 }
 

@@ -321,7 +321,7 @@ export default function ChatArea({ conversationId }) {
         }}
         onDrop={async (e) => {
           e.preventDefault();
-          if (await handleFileDrop(e)) toast?.('📷 Image(s) dropped', 'success');
+          if (await handleFileDrop(e)) toast?.(t('image_dropped'), 'success');
         }}
         className="flex-1 overflow-y-auto px-4 py-5 space-y-4"
       >
@@ -422,7 +422,7 @@ export default function ChatArea({ conversationId }) {
                 <button
                   onClick={() => removeImage(img.id)}
                   className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 hover:bg-red-400 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Remove image"
+                  title={t('remove_image')}
                 >
                   <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                     <path d="M18 6L6 18M6 6l12 12" />
@@ -434,15 +434,14 @@ export default function ChatArea({ conversationId }) {
                   </p>
                 )}
                 {!img.caption && !img.visionLoaded && (
-                  <p className="text-[8px] mt-0.5 text-amber-500/70 max-w-14 leading-tight">No caption</p>
+                  <p className="text-[8px] mt-0.5 text-amber-500/70 max-w-14 leading-tight">{t('no_caption')}</p>
                 )}
               </div>
             ))}
           </div>
           {pendingImages.some((img) => !img.caption) && (
             <p className="text-[10px] mt-1.5 text-amber-500/60">
-              📷 Image attached — AI may not see its contents. Download the <strong>Image Understanding</strong> model
-              in the sidebar to enable automatic captions.
+              {t('image_no_caption')}
             </p>
           )}
         </div>
@@ -487,15 +486,15 @@ export default function ChatArea({ conversationId }) {
               const files = Array.from(e.target.files || []);
               e.target.value = '';
               for (const file of files) await addImage(file);
-              if (files.length > 0) toast?.(`📷 ${files.length} image(s) attached`, 'success');
+              if (files.length > 0) toast?.(t('image_attached', { n: files.length }), 'success');
             }}
           />
           <label
             htmlFor="image-upload"
             className="inline-flex items-center justify-center rounded-xl text-sm transition-all h-[42px] w-[42px] p-0 hover:bg-white/5 cursor-pointer relative"
             style={{ color: 'var(--text-muted)' }}
-            title="Attach image"
-            aria-label="Attach image"
+            title={t('attach_image')}
+            aria-label={t('attach_image')}
           >
             <svg
               width="16"
@@ -527,7 +526,7 @@ export default function ChatArea({ conversationId }) {
                 if (hasImage) {
                   e.preventDefault();
                   await handlePaste(e);
-                  toast?.('📷 Image pasted', 'success');
+                  toast?.(t('image_pasted'), 'success');
                 }
               }}
               onKeyDown={handleKeyDown}
