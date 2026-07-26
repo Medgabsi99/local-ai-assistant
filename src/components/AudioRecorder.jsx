@@ -33,7 +33,7 @@ export default function AudioRecorder({ onTranscriptionComplete }) {
       timerRef.current = setInterval(() => setDuration((d) => d + 1), 1000);
     } catch (err) {
       if (err.name === 'NotAllowedError') {
-        alert('Microphone permission denied. Please allow microphone access in your browser settings.');
+        alert(t('microphone_denied'));
       } else {
         console.error(err);
       }

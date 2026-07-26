@@ -4,6 +4,7 @@ import { useRAG } from '../hooks/useRAG';
 import { getAllDocuments, getDocument, deleteDocument, updateDocument, deleteDocumentVectors } from '../db/database';
 import { DOC_PREVIEW_MAX_CHARS, TAGS_MAX_COUNT } from '../lib/constants';
 import PdfViewer from './PdfViewer';
+import ConfirmModal from './ConfirmModal';
 import {
   FileText,
   File,
@@ -26,6 +27,8 @@ export default function DocumentPane() {
   const [searchQuery, setSearchQuery] = useState('');
   const [tagInput, setTagInput] = useState('');
   const [tagSaveError, setTagSaveError] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState(null);
   const { processPDF, processText, getStats, isProcessing, progress, error, setError } = useRAG();
   const [storeStats, setStoreStats] = useState(null);
 
@@ -63,7 +66,7 @@ export default function DocumentPane() {
       else if (file.type === 'text/plain' || file.name.endsWith('.md') || file.name.endsWith('.csv')) {
         await processText(await file.text(), file.name, file.type);
       } else {
-        setError('Unsupported file type.');
+        setError(t('unsupported_file'));
         return;
       }
       await loadDocuments();
@@ -89,10 +92,16 @@ export default function DocumentPane() {
     setTagSaveError('');
   };
 
-  const handleDelete = async (docId) => {
-    await deleteDocument(docId);
-    await deleteDocumentVectors(docId);
-    if (selectedDoc === docId) {
+  const promptDelete = (docId) => {
+    setDeleteTargetId(docId);
+    setShowDeleteConfirm(true);
+  };
+
+  const doDelete = async () => {
+    if (!deleteTargetId) return;
+    await deleteDocument(deleteTargetId);
+    await deleteDocumentVectors(deleteTargetId);
+    if (selectedDoc === deleteTargetId) {
       setSelectedDoc(null);
       setDocContent('');
       setTagInput('');
@@ -100,6 +109,7 @@ export default function DocumentPane() {
     }
     await loadDocuments();
     await loadStats();
+    setDeleteTargetId(null);
   };
 
   const getFileIcon = (fileType) => {
@@ -249,7 +259,7 @@ export default function DocumentPane() {
                 {t('no_documents')}
               </p>
               <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                Drop files or click Upload to add PDF, TXT, MD, CSV
+                {t('no_documents_desc')}
               </p>
             </div>
           )}
@@ -283,13 +293,13 @@ export default function DocumentPane() {
                     </div>
                   )}
                   <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                    {new Date(doc.createdAt).toLocaleDateString()} · {(doc.content?.length / 1000).toFixed(1)} KB
+                    {new Date(doc.createdAt).toLocaleDateString()} · {(doc.content?.length / 1000).toFixed(1)} {t('kb')}
                   </p>
                 </div>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleDelete(doc.id);
+                    promptDelete(doc.id);
                   }}
                   className="btn-icon text-slate-500 hover:text-red-400"
                   title={t('del')}
@@ -310,7 +320,7 @@ export default function DocumentPane() {
                 {selectedDocument?.title || t('documents')}
               </h3>
               <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                {(docContent.length / 1000).toFixed(1)} KB · {docContent.split(/\s+/).length} words
+                {t('document_size', { size: (docContent.length / 1000).toFixed(1), words: docContent.split(/\s+/).length })}
               </span>
             </div>
             <div className="card p-4 mb-4 space-y-3">
@@ -395,6 +405,15 @@ export default function DocumentPane() {
           </div>
         )}
       </div>
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={doDelete}
+        title={t('del')}
+        message={t('delete_document_confirm')}
+        confirmText={t('del')}
+        danger
+      />
     </div>
   );
 }

@@ -5,6 +5,7 @@
 // ============================================================
 
 import { lazy, Suspense } from 'react';
+import { t } from '../lib/i18n';
 
 const SyntaxHighlighter = lazy(() =>
   import('react-syntax-highlighter').then((mod) => ({
@@ -38,7 +39,7 @@ export default function LazyCodeBlock({ className, children }) {
         <button
           onClick={() => navigator.clipboard.writeText(code)}
           className="hover:text-slate-300 transition-colors"
-          aria-label="Copy code"
+          aria-label={t('copy_code')}
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
