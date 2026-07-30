@@ -56,6 +56,18 @@ export default function App() {
   const [lang, setLang] = useState(getLanguage());
 
   useEffect(() => {
+    try {
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+        document.documentElement.classList.add('light');
+      } else {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    } catch (e) { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
     const handleKey = async (e) => {
       if (!e.metaKey && !e.ctrlKey) return;
       if (e.key === 'n') {

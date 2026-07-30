@@ -23,6 +23,36 @@
 
 :root {
   --bg-primary: #0f172a;
+  --bg-primary-light: #ffffff;
+  --bg-secondary-light: #f1f5f9;
+  --bg-card-light: #ffffff;
+  --bg-hover-light: rgba(0, 0, 0, 0.05);
+  --border-light-mode: #e2e8f0;
+  --text-primary-light: #0f172a;
+  --text-secondary-light: #475569;
+  --text-muted-light: #94a3b8;
+}
+
+[data-theme="light"] {
+  --bg-primary: var(--bg-primary-light);
+  --bg-secondary: var(--bg-secondary-light);
+  --bg-card: var(--bg-card-light);
+  --bg-input: var(--bg-secondary-light);
+  --bg-hover: var(--bg-hover-light);
+  --border: var(--border-light-mode);
+  --border-light: #cbd5e1;
+  --text-primary: var(--text-primary-light);
+  --text-secondary: var(--text-secondary-light);
+  --text-muted: var(--text-muted-light);
+  --text-inverse: #ffffff;
+  --surface-overlay: rgba(0, 0, 0, 0.3);
+  --msg-ai-bg: #f8fafc;
+  --msg-ai-border: rgba(0, 0, 0, 0.06);
+  --msg-user-bg: var(--accent);
+}
+
+:root {
+  --bg-primary: #0f172a;
   --bg-secondary: #1e293b;
   --bg-card: #1e293b;
   --bg-input: #1e293b;

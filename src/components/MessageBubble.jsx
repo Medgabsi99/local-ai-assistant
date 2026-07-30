@@ -3,7 +3,7 @@
 // Extracted from ChatArea.jsx to reduce file size
 // ============================================================
 
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -24,7 +24,7 @@ function CodeBlock({ className, children }) {
         <button
           onClick={() => navigator.clipboard.writeText(code)}
           className="hover:text-slate-300 transition-colors"
-          aria-label="Copy code block"
+          aria-label={t('code_block_copy')}
         >
           <Copy size={12} />
         </button>
@@ -70,7 +70,7 @@ function HighlightedText({ text, searchQuery }) {
   );
 }
 
-export default function MessageBubble({
+const MessageBubble = memo(function MessageBubble({
   msg,
   searchQuery,
   activeSearchId,
@@ -248,4 +248,6 @@ export default function MessageBubble({
       </div>
     </div>
   );
-}
+});
+
+export default MessageBubble;

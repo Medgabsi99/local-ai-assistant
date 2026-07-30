@@ -85,6 +85,48 @@ test.describe('Keyboard Shortcuts', () => {
   });
 });
 
+test.describe('Settings Modal', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('http://localhost:5173');
+    await page.getByLabel('Settings').first().click();
+    await page.waitForTimeout(500);
+  });
+
+  test('can switch between settings tabs', async ({ page }) => {
+    await expect(page.getByText('Statistics')).toBeVisible();
+    await page.getByText('Data Management').click();
+    await expect(page.getByText('Export Backup')).toBeVisible();
+    await page.getByText('Local LLM Server').click();
+    await expect(page.getByText('Server URL')).toBeVisible();
+  });
+
+  test('can toggle theme between dark and light', async ({ page }) => {
+    await page.getByText('Appearance').click();
+    await page.waitForTimeout(300);
+    await expect(page.getByText('Toggle theme')).toBeVisible();
+    await page.getByText('Light').click();
+    await page.waitForTimeout(300);
+    const html = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+    expect(html).toBe('light');
+  });
+
+  test('can switch language to French', async ({ page }) => {
+    await page.getByText('Appearance').click();
+    await page.waitForTimeout(300);
+    await page.getByText('Français').click();
+    await page.waitForTimeout(500);
+    await expect(page.getByText('Paramètres')).toBeVisible();
+  });
+
+  test('can switch language to Arabic', async ({ page }) => {
+    await page.getByText('Appearance').click();
+    await page.waitForTimeout(300);
+    await page.getByText('العربية').click();
+    await page.waitForTimeout(500);
+    await expect(page.getByText('الإعدادات')).toBeVisible();
+  });
+});
+
 test.describe('Accessibility', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('http://localhost:5173');

@@ -41,6 +41,9 @@ export default function SettingsModal({ isOpen, onClose }) {
   const [importPayload, setImportPayload] = useState(null);
   const [transferring, setTransferring] = useState(false);
   const importInputRef = useRef(null);
+  const [theme, setThemeState] = useState(() => {
+    try { return localStorage.getItem('theme') || 'dark'; } catch { return 'dark'; }
+  });
   const [serverCfg, setServerCfg] = useState(getServerConfig());
   const [srvStatus, setSrvStatus] = useState({ checking: false, result: null });
   const { switchLang } = useLang();
@@ -435,6 +438,48 @@ export default function SettingsModal({ isOpen, onClose }) {
                   ))}
                 </div>
               </div>
+              <div>
+                <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+                  {t('toggle_theme')}
+                </h3>
+                <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+                  {theme === 'dark' ? t('theme_dark') : t('theme_light')}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      document.documentElement.setAttribute('data-theme', 'dark');
+                      document.documentElement.classList.remove('light');
+                      try { localStorage.setItem('theme', 'dark'); } catch {}
+                      setThemeState('dark');
+                    }}
+                    className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${theme === 'dark' ? 'ring-1 shadow-sm' : 'hover:bg-white/5'}`}
+                    style={{
+                      background: theme === 'dark' ? 'var(--accent-light)' : 'var(--bg-secondary)',
+                      color: theme === 'dark' ? 'var(--accent)' : 'var(--text-secondary)',
+                      ringColor: theme === 'dark' ? 'var(--accent-ring)' : 'transparent',
+                    }}
+                  >
+                    🌙 {t('theme_dark')}
+                  </button>
+                  <button
+                    onClick={() => {
+                      document.documentElement.setAttribute('data-theme', 'light');
+                      document.documentElement.classList.add('light');
+                      try { localStorage.setItem('theme', 'light'); } catch {}
+                      setThemeState('light');
+                    }}
+                    className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${theme === 'light' ? 'ring-1 shadow-sm' : 'hover:bg-white/5'}`}
+                    style={{
+                      background: theme === 'light' ? 'var(--accent-light)' : 'var(--bg-secondary)',
+                      color: theme === 'light' ? 'var(--accent)' : 'var(--text-secondary)',
+                      ringColor: theme === 'light' ? 'var(--accent-ring)' : 'transparent',
+                    }}
+                  >
+                    ☀️ {t('theme_light')}
+                  </button>
+                </div>
+              </div>
             </>
           )}
 
@@ -618,9 +663,9 @@ export default function SettingsModal({ isOpen, onClose }) {
 }
 
 function formatBytes(bytes) {
-  if (bytes === 0) return '0 B';
+  if (bytes === 0) return `0 ${t('b')}`;
   const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const sizes = [t('b'), t('kb'), t('mb'), t('gb')];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }

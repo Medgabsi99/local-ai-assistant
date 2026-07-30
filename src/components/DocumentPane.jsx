@@ -5,6 +5,7 @@ import { getAllDocuments, getDocument, deleteDocument, updateDocument, deleteDoc
 import { DOC_PREVIEW_MAX_CHARS, TAGS_MAX_COUNT } from '../lib/constants';
 import PdfViewer from './PdfViewer';
 import ConfirmModal from './ConfirmModal';
+import Skeleton from './Skeleton';
 import {
   FileText,
   File,
@@ -29,6 +30,7 @@ export default function DocumentPane() {
   const [tagSaveError, setTagSaveError] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState(null);
+  const [loading, setLoading] = useState(true);
   const { processPDF, processText, getStats, isProcessing, progress, error, setError } = useRAG();
   const [storeStats, setStoreStats] = useState(null);
 
@@ -50,6 +52,7 @@ export default function DocumentPane() {
       if (!ignore) {
         setDocuments(docs);
         setStoreStats(stats);
+        setLoading(false);
       }
     })();
     return () => {
@@ -250,7 +253,9 @@ export default function DocumentPane() {
           )}
         </div>
         <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
-          {documents.length === 0 && !isProcessing && (
+          {loading ? (
+            <Skeleton count={4} type="card" />
+          ) : documents.length === 0 && !isProcessing ? (
             <div className="text-center py-12 animate-fade-in">
               <div className="empty-state-icon">
                 <FileUp size={28} />
@@ -262,7 +267,7 @@ export default function DocumentPane() {
                 {t('no_documents_desc')}
               </p>
             </div>
-          )}
+          ) : null}
           {filteredDocuments.map((doc, i) => (
             <div
               key={doc.id}
