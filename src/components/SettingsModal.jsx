@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { ai } from '../workers/worker-bridge';
 import { db, exportAppData, importAppData, getConversationMessages, setSetting } from '../db/database';
+import { normalizeBackupPayload } from '../db/backup';
 import { getVectorStore, resetVectorStore } from '../lib/vector-store-access';
 import { exportRateLimiter } from '../lib/security';
 import { getServerConfig, setServerConfig, checkServer } from '../lib/llm-server';
@@ -42,7 +43,11 @@ export default function SettingsModal({ isOpen, onClose }) {
   const [transferring, setTransferring] = useState(false);
   const importInputRef = useRef(null);
   const [theme, setThemeState] = useState(() => {
-    try { return localStorage.getItem('theme') || 'dark'; } catch { return 'dark'; }
+    try {
+      return localStorage.getItem('theme') || 'dark';
+    } catch {
+      return 'dark';
+    }
   });
   const [serverCfg, setServerCfg] = useState(getServerConfig());
   const [srvStatus, setSrvStatus] = useState({ checking: false, result: null });
@@ -174,12 +179,13 @@ export default function SettingsModal({ isOpen, onClose }) {
     if (!importPayload) return;
     setTransferring(true);
     try {
+      const normalizedPayload = normalizeBackupPayload(importPayload);
       const store = await getVectorStore();
       await db.delete();
       await db.open();
-      await importAppData(importPayload);
+      await importAppData(normalizedPayload);
       await store.clear();
-      await store.importData(importPayload.vectorStore || {});
+      await store.importData(normalizedPayload.vectorStore || {});
       toast?.(t('data_imported'), 'success');
       window.location.reload();
     } catch (error) {
@@ -450,7 +456,9 @@ export default function SettingsModal({ isOpen, onClose }) {
                     onClick={() => {
                       document.documentElement.setAttribute('data-theme', 'dark');
                       document.documentElement.classList.remove('light');
-                      try { localStorage.setItem('theme', 'dark'); } catch {}
+                      try {
+                        localStorage.setItem('theme', 'dark');
+                      } catch {}
                       setThemeState('dark');
                     }}
                     className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${theme === 'dark' ? 'ring-1 shadow-sm' : 'hover:bg-white/5'}`}
@@ -466,7 +474,9 @@ export default function SettingsModal({ isOpen, onClose }) {
                     onClick={() => {
                       document.documentElement.setAttribute('data-theme', 'light');
                       document.documentElement.classList.add('light');
-                      try { localStorage.setItem('theme', 'light'); } catch {}
+                      try {
+                        localStorage.setItem('theme', 'light');
+                      } catch {}
                       setThemeState('light');
                     }}
                     className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${theme === 'light' ? 'ring-1 shadow-sm' : 'hover:bg-white/5'}`}
