@@ -77,7 +77,7 @@ export default function VectorStoreManager({ isOpen, onClose }) {
           </div>
         ) : (
           <div className="space-y-5">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {[
                 { label: t('vectors'), value: stats?.totalVectors || 0, icon: '🧬' },
                 { label: t('documents'), value: stats?.totalDocuments || 0, icon: '📄' },

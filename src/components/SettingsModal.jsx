@@ -241,13 +241,13 @@ export default function SettingsModal({ isOpen, onClose }) {
       onClick={onClose}
     >
       <div
-        className="flex w-full max-w-2xl max-h-[85vh] overflow-hidden rounded-2xl shadow-2xl animate-scale-in"
+        className="flex flex-col md:flex-row w-full max-w-2xl max-h-[85vh] overflow-hidden rounded-2xl shadow-2xl animate-scale-in mx-4 md:mx-0"
         onClick={(e) => e.stopPropagation()}
         style={{ background: 'var(--bg-primary)', border: '1px solid var(--border)' }}
       >
-        {/* Sidebar Tabs */}
+        {/* Sidebar Tabs - horizontal on mobile, vertical on desktop */}
         <div
-          className="w-48 flex-shrink-0 p-3 space-y-1"
+          className="w-full md:w-48 flex-shrink-0 p-3 flex flex-row md:flex-col gap-1 overflow-x-auto"
           style={{ borderRight: '1px solid var(--border)', background: 'var(--bg-secondary)' }}
         >
           <div className="flex items-center justify-between mb-4 px-2">

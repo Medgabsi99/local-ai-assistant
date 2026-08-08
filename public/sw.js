@@ -4,7 +4,7 @@
 
 // Increment this version any time you rename files or make breaking changes
 // Old caches are automatically cleaned up on activate
-const CACHE_NAME = 'local-ai-v3';
+const CACHE_NAME = 'local-ai-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -40,6 +40,13 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  const cacheResponseIfOk = async (response) => {
+    if (!response || !response.ok) return response;
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put(request, response.clone());
+    return response;
+  };
+
   // Skip non-GET requests and browser extensions
   if (request.method !== 'GET') return;
   if (!url.protocol.startsWith('http')) return;
@@ -54,15 +61,20 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For static assets (JS, CSS, images), use cache-first
+  // For static assets (JS, CSS, images), use network-first with cache fallback
+  // (network-first prevents stale module errors when code changes)
   if (url.pathname.match(/\.(js|css|png|jpg|svg|ico|woff2?)$/)) {
     event.respondWith(
-      caches.match(request).then((cached) => cached || fetch(request).then((response) => {
-        return caches.open(CACHE_NAME).then((cache) => {
-          cache.put(request, response.clone());
-          return response;
-        });
-      })),
+      fetch(request)
+        .then((response) => {
+          if (response && response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            return response;
+          }
+          return caches.match(request);
+        })
+        .catch(() => caches.match(request)),
     );
     return;
   }
@@ -71,12 +83,7 @@ self.addEventListener('fetch', (event) => {
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
-        .then((response) => {
-          return caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, response.clone());
-            return response;
-          });
-        })
+        .then(cacheResponseIfOk)
         .catch(() => {
           return caches.match('/offline.html').then((offlinePage) => {
             return offlinePage || new Response('Offline', { status: 503 });
@@ -87,7 +94,5 @@ self.addEventListener('fetch', (event) => {
   }
 
   // For everything else, network-first
-  event.respondWith(
-    fetch(request).catch(() => caches.match(request)),
-  );
+  event.respondWith(fetch(request).catch(() => caches.match(request)));
 });
