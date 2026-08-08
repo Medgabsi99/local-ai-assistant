@@ -4,42 +4,10 @@
 // ============================================================
 
 import { useState, memo } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Copy, Pencil, Trash2, Star, Volume2, Square } from 'lucide-react';
 import { t } from '../lib/i18n';
-import MarkdownImage from './MarkdownImage';
-
-function CodeBlock({ className, children }) {
-  const match = /language-(\w+)/.exec(className || '');
-  const lang = match ? match[1] : '';
-  const code = String(children).replace(/\n$/, '');
-  if (!lang) return <code className="bg-slate-700/60 px-1 py-0.5 rounded text-emerald-300 text-[13px]">{code}</code>;
-  return (
-    <div className="my-3 rounded-xl overflow-hidden border border-slate-700/60">
-      <div className="flex items-center justify-between px-4 py-1.5 bg-slate-800 text-[11px] text-slate-500">
-        <span>{lang}</span>
-        <button
-          onClick={() => navigator.clipboard.writeText(code)}
-          className="hover:text-slate-300 transition-colors"
-          aria-label={t('code_block_copy')}
-        >
-          <Copy size={12} />
-        </button>
-      </div>
-      <SyntaxHighlighter
-        style={oneDark}
-        language={lang}
-        PreTag="div"
-        customStyle={{ margin: 0, borderRadius: 0, fontSize: '13px' }}
-      >
-        {code}
-      </SyntaxHighlighter>
-    </div>
-  );
-}
+import SafeMarkdown from './SafeMarkdown';
+import LazyCodeBlock from './LazySyntaxHighlighter';
 
 function HighlightedText({ text, searchQuery }) {
   if (!searchQuery.trim()) return <>{text}</>;
@@ -131,25 +99,7 @@ const MessageBubble = memo(function MessageBubble({
               </div>
             ) : (
               <div className="prose prose-invert prose-sm max-w-none prose-code:before:content-none prose-code:after:content-none">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    img({ src, alt }) {
-                      return <MarkdownImage src={src} alt={alt} />;
-                    },
-                    code({ inline, className, children, ...props }) {
-                      if (inline)
-                        return (
-                          <code className="bg-slate-700/60 px-1 py-0.5 rounded text-emerald-300 text-[13px]" {...props}>
-                            {children}
-                          </code>
-                        );
-                      return <CodeBlock className={className}>{children}</CodeBlock>;
-                    },
-                  }}
-                >
-                  {msg.content}
-                </ReactMarkdown>
+                <SafeMarkdown CodeBlock={LazyCodeBlock}>{msg.content}</SafeMarkdown>
               </div>
             )}
             {msg.metadata?.contextSources?.length > 0 && (

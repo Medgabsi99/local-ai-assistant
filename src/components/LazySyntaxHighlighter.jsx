@@ -8,15 +8,24 @@ import { lazy, Suspense } from 'react';
 import { t } from '../lib/i18n';
 
 const SyntaxHighlighter = lazy(() =>
-  import('react-syntax-highlighter').then((mod) => ({
-    default: mod.Prism,
-  })),
-);
+  Promise.all([import('react-syntax-highlighter'), import('react-syntax-highlighter/dist/esm/styles/prism')]).then(
+    ([syntaxModule, styleModule]) => {
+      function LazyPrismBlock({ language, children }) {
+        return (
+          <syntaxModule.Prism
+            style={styleModule.oneDark}
+            language={language}
+            PreTag="div"
+            customStyle={{ margin: 0, borderRadius: 0, fontSize: '13px' }}
+          >
+            {children}
+          </syntaxModule.Prism>
+        );
+      }
 
-const oneDark = lazy(() =>
-  import('react-syntax-highlighter/dist/esm/styles/prism').then((mod) => ({
-    default: mod.oneDark,
-  })),
+      return { default: LazyPrismBlock };
+    },
+  ),
 );
 
 export default function LazyCodeBlock({ className, children }) {
@@ -25,11 +34,7 @@ export default function LazyCodeBlock({ className, children }) {
   const code = String(children).replace(/\n$/, '');
 
   if (!lang) {
-    return (
-      <code className="bg-slate-700/60 px-1 py-0.5 rounded text-emerald-300 text-[13px]">
-        {code}
-      </code>
-    );
+    return <code className="bg-slate-700/60 px-1 py-0.5 rounded text-emerald-300 text-[13px]">{code}</code>;
   }
 
   return (
@@ -54,14 +59,7 @@ export default function LazyCodeBlock({ className, children }) {
           </pre>
         }
       >
-        <SyntaxHighlighter
-          style={oneDark}
-          language={lang}
-          PreTag="div"
-          customStyle={{ margin: 0, borderRadius: 0, fontSize: '13px' }}
-        >
-          {code}
-        </SyntaxHighlighter>
+        <SyntaxHighlighter language={lang}>{code}</SyntaxHighlighter>
       </Suspense>
     </div>
   );

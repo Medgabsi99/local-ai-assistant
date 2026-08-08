@@ -1,5 +1,25 @@
 import { useState, useEffect } from 'react';
 import { resolveImageSrc } from '../hooks/useImageAttachments';
+import * as security from '../lib/security';
+
+function isSafeImageSrc(src) {
+  if (typeof security.isSafeImageSrc === 'function') {
+    return security.isSafeImageSrc(src);
+  }
+
+  if (typeof src !== 'string' || !src.trim()) return false;
+  const value = src.trim();
+  if (value.startsWith('img:')) return true;
+  if (value.startsWith('data:') || value.startsWith('blob:')) return true;
+
+  try {
+    const parsed = new URL(value, window.location.origin);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+    return parsed.origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Custom markdown image component that resolves img:ID references from IndexedDB.
@@ -18,11 +38,15 @@ export default function MarkdownImage({ src, alt }) {
     let cancelled = false;
     if (src?.startsWith('img:')) {
       const id = parseInt(src.slice(4), 10);
-      resolveImageSrc(id).then((resolved) => {
-        if (!cancelled) setImgSrc(resolved);
-      });
+      if (Number.isFinite(id)) {
+        resolveImageSrc(id).then((resolved) => {
+          if (!cancelled) setImgSrc(resolved);
+        });
+      } else {
+        setImgSrc(null);
+      }
     } else {
-      setImgSrc(src);
+      setImgSrc(isSafeImageSrc(src) ? src : null);
     }
     return () => {
       cancelled = true;

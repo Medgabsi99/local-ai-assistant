@@ -1,8 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { getConversationMessages, addMessage, deleteMessage, toggleMessageStar } from '../db/database';
 import { t } from '../lib/i18n';
 import { Lock, Bold, Italic, Code, Link, List, BookOpen } from 'lucide-react';
@@ -21,39 +17,8 @@ import AudioRecorder from './AudioRecorder';
 import { useSmartReplies } from '../hooks/useSmartReplies';
 import { useImageAttachments } from '../hooks/useImageAttachments';
 import MessageBubble from './MessageBubble';
-
-// Reusable code block for streaming content (extracted to keep ChatArea manageable)
-function CodeBlock({ className, children }) {
-  const match = /language-(\w+)/.exec(className || '');
-  const lang = match ? match[1] : '';
-  const code = String(children).replace(/\n$/, '');
-  if (!lang) return <code className="bg-slate-700/60 px-1 py-0.5 rounded text-emerald-300 text-[13px]">{code}</code>;
-  return (
-    <div className="my-3 rounded-xl overflow-hidden border border-slate-700/60">
-      <div className="flex items-center justify-between px-4 py-1.5 bg-slate-800 text-[11px] text-slate-500">
-        <span>{lang}</span>
-        <button
-          onClick={() => navigator.clipboard.writeText(code)}
-          className="hover:text-slate-300 transition-colors"
-          aria-label={t('copy')}
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-          </svg>
-        </button>
-      </div>
-      <SyntaxHighlighter
-        style={oneDark}
-        language={lang}
-        PreTag="div"
-        customStyle={{ margin: 0, borderRadius: 0, fontSize: '13px' }}
-      >
-        {code}
-      </SyntaxHighlighter>
-    </div>
-  );
-}
+import SafeMarkdown from './SafeMarkdown';
+import LazyCodeBlock from './LazySyntaxHighlighter';
 
 export default function ChatArea({ conversationId }) {
   const toast = useToast();
@@ -357,25 +322,7 @@ export default function ChatArea({ conversationId }) {
               <div className="msg-ai">
                 {streamingContent ? (
                   <div className="prose prose-invert prose-sm max-w-none">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        code({ inline, className, children, ...props }) {
-                          if (inline)
-                            return (
-                              <code
-                                className="bg-slate-700/60 px-1 py-0.5 rounded text-emerald-300 text-[13px]"
-                                {...props}
-                              >
-                                {children}
-                              </code>
-                            );
-                          return <CodeBlock className={className}>{children}</CodeBlock>;
-                        },
-                      }}
-                    >
-                      {streamingContent}
-                    </ReactMarkdown>
+                    <SafeMarkdown CodeBlock={LazyCodeBlock}>{streamingContent}</SafeMarkdown>
                     <span className="inline-block w-1.5 h-4 bg-emerald-400 ml-0.5 animate-pulse rounded-sm align-middle" />
                   </div>
                 ) : (
@@ -440,9 +387,7 @@ export default function ChatArea({ conversationId }) {
             ))}
           </div>
           {pendingImages.some((img) => !img.caption) && (
-            <p className="text-[10px] mt-1.5 text-amber-500/60">
-              {t('image_no_caption')}
-            </p>
+            <p className="text-[10px] mt-1.5 text-amber-500/60">{t('image_no_caption')}</p>
           )}
         </div>
       )}
