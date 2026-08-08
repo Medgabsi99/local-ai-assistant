@@ -302,18 +302,34 @@ class VectorStore {
   async importData(payload = {}) {
     await this.clear();
     if (!Array.isArray(payload.vectors) || !Array.isArray(payload.metadata)) return;
+    if (payload.vectors.length !== payload.metadata.length) return;
+
+    const vectors = payload.vectors.map((embedding) => {
+      if (!Array.isArray(embedding) || embedding.length === 0) return null;
+      const values = embedding.map((value) => Number(value));
+      return values.every((value) => Number.isFinite(value)) ? values : null;
+    });
+    if (vectors.some((vector) => vector === null)) return;
+
+    const dimension = vectors[0]?.length;
+    if (!Number.isInteger(dimension) || dimension <= 0) return;
+    if (vectors.some((vector) => vector.length !== dimension)) return;
+
+    const metadata = payload.metadata.map((item) => (item && typeof item === 'object' ? item : null));
+    if (metadata.some((item) => item === null)) return;
+
     const db = getDb();
-    const items = payload.vectors.map((embedding, i) => ({
+    const items = vectors.map((embedding, i) => ({
       embedding,
-      documentId: payload.metadata[i]?.documentId || null,
-      documentTitle: payload.metadata[i]?.documentTitle || '',
-      chunkIndex: payload.metadata[i]?.chunkIndex ?? -1,
-      tags: payload.metadata[i]?.tags || [],
+      documentId: metadata[i].documentId || null,
+      documentTitle: metadata[i].documentTitle || '',
+      chunkIndex: metadata[i].chunkIndex ?? -1,
+      tags: Array.isArray(metadata[i].tags) ? metadata[i].tags : [],
       createdAt: new Date().toISOString(),
     }));
     const ids = await db.vectors.bulkAdd(items, { allKeys: true });
-    this.vectors = payload.vectors;
-    this.metadata = payload.metadata.map((m, i) => ({ ...m, index: ids[i] }));
+    this.vectors = vectors;
+    this.metadata = metadata.map((m, i) => ({ ...m, index: ids[i] }));
     for (let i = 0; i < this.vectors.length; i++) this.hnsw.insert(this.vectors[i], i);
   }
 

@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { ai, pdf } from '../workers/worker-bridge';
-import { getVectorStore } from '../workers/vector-store';
+import { getVectorStore } from '../lib/vector-store-access';
 import { getDocumentChunks, saveDocument, saveDocumentChunks } from '../db/database';
 import { CHUNK_OVERLAP, CHUNK_SIZE, RAG_FETCH_MULTIPLIER } from '../lib/constants';
 import { hybridSearch } from '../lib/hybrid-search';

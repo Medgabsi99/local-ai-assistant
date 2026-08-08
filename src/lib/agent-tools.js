@@ -134,7 +134,12 @@ async function fetchURL(url) {
   if (!webSearchRateLimiter.canCall('fetch')) return 'Rate limited: too many URL fetch requests. Please wait.';
   try {
     const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+    const res = await fetch(proxyUrl, {
+      signal: AbortSignal.timeout(8000),
+      credentials: 'omit',
+      cache: 'no-store',
+      referrerPolicy: 'no-referrer',
+    });
     if (!res.ok) return `Failed to fetch: HTTP ${res.status}`;
     const data = await res.json();
     const html = data.contents || '';

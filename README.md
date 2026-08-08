@@ -43,17 +43,17 @@ For users with local AI servers, you can connect to [Ollama](https://ollama.com)
 ## Features
 
 ### Core AI
+
 - **In-Browser LLM** — LaMini-Flan-T5, TinyLlama, and Qwen running entirely in your browser via WebAssembly
 - **Embedding Model** — all-MiniLM-L6-v2 for semantic search and RAG
 - **Whisper Speech-to-Text** — Transcribe audio recordings using Whisper Tiny EN
 - **Image Recognition (Vision)** — Upload images and AI describes what's in them (ViT-GPT2)
-- **Text-to-Speech** — Neural voice synthesis from downloaded TTS model
 - **Local Server Mode** — Connect to Ollama or any OpenAI-compatible API
-- **Code Execution** — Sandboxed JavaScript runner in a Web Worker (no network or DOM access)
 - **Agent Tools** — Calculator (with `^` exponentiation), unit converter, date/time
 - **Web Search** — Optional DuckDuckGo integration for current information
 
 ### RAG & Documents
+
 - **Upload & Process** — Drag-and-drop or upload PDF, TXT, MD, and CSV files
 - **Hybrid Search** — BM25 keyword search + vector similarity re-ranking
 - **Vector Database** — Documents chunked (500 chars, 100 overlap), embedded, stored in IndexedDB
@@ -61,6 +61,7 @@ For users with local AI servers, you can connect to [Ollama](https://ollama.com)
 - **Source Attribution** — AI responses show which documents were used
 
 ### Chat
+
 - **Streaming Responses** — Real-time token-by-token streaming
 - **Stop Generation** — Cancel inference mid-response
 - **Edit & Regenerate** — Edit messages and regenerate AI responses
@@ -71,6 +72,7 @@ For users with local AI servers, you can connect to [Ollama](https://ollama.com)
 - **Read Aloud** — 🔊 button reads AI responses using Web Speech API
 
 ### Conversation Management
+
 - **Pin / Rename / Archive** — Organize conversations
 - **Date Grouping** — Today, Yesterday, This Week, Older
 - **In-Chat Search** — Search messages with role filtering (All / User / AI)
@@ -78,6 +80,7 @@ For users with local AI servers, you can connect to [Ollama](https://ollama.com)
 - **Share** — Copy as text or download as Markdown
 
 ### UI / UX
+
 - **Dark & Light Themes** — Toggle between modes
 - **6 Accent Colors** — Emerald, Blue, Violet, Amber, Rose, Cyan
 - **Multi-Language** — English, Français, العربية (Arabic RTL support)
@@ -89,6 +92,7 @@ For users with local AI servers, you can connect to [Ollama](https://ollama.com)
 - **Error Boundaries** — Graceful error handling with reload option
 
 ### PWA
+
 - **Installable** — Works as a standalone desktop/mobile app
 - **Offline Support** — Cached assets via service worker
 - **Auto-Update** — Service worker auto-updates on new releases
@@ -97,23 +101,23 @@ For users with local AI servers, you can connect to [Ollama](https://ollama.com)
 
 ## Tech Stack
 
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| **UI Framework** | [React 19](https://react.dev/) | Component rendering |
-| **Build Tool** | [Vite 8](https://vitejs.dev/) | Dev server, bundling |
-| **Styling** | [Tailwind CSS 4](https://tailwindcss.com/) + CSS custom properties | Utility-first styling with dynamic theming |
-| **AI Inference** | [@xenova/transformers](https://github.com/xenova/transformers.js) v2.17 | In-browser ML model execution |
-| **Runtime** | [onnxruntime-web](https://github.com/microsoft/onnxruntime-web) 1.14 | ONNX model runtime |
-| **Database** | [Dexie.js](https://dexie.org/) 4.4 | IndexedDB wrapper (app data, vectors, images, memory) |
-| **Icons** | [lucide-react](https://lucide.dev/) | Consistent SVG icon set |
-| **Markdown** | [react-markdown](https://github.com/remarkjs/react-markdown) + [react-syntax-highlighter](https://github.com/react-syntax-highlighter/react-syntax-highlighter) | Message rendering |
-| **PDF** | [pdfjs-dist](https://mozilla.github.io/pdf.js/) 5.7 | PDF text extraction and rendering |
-| **PWA** | [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) 1.3 | Service worker, manifest |
-| **Testing** | [Vitest](https://vitest.dev/) 4.1 + [Testing Library](https://testing-library.com/) | Unit and integration tests |
-| **E2E Testing** | [Playwright](https://playwright.dev/) | End-to-end and accessibility tests |
-| **Linting** | [ESLint](https://eslint.org/) 10 | Code quality (0 errors) |
-| **Formatting** | [Prettier](https://prettier.io/) 3.9 | Code formatting |
-| **Pre-commit** | [Husky](https://typicode.github.io/husky/) + [lint-staged](https://github.com/lint-staged/lint-staged) | Auto-lint on commit |
+| Layer            | Technology                                                                                                                                                      | Purpose                                               |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| **UI Framework** | [React 19](https://react.dev/)                                                                                                                                  | Component rendering                                   |
+| **Build Tool**   | [Vite 8](https://vitejs.dev/)                                                                                                                                   | Dev server, bundling                                  |
+| **Styling**      | [Tailwind CSS 4](https://tailwindcss.com/) + CSS custom properties                                                                                              | Utility-first styling with dynamic theming            |
+| **AI Inference** | [@xenova/transformers](https://github.com/xenova/transformers.js) v2.17                                                                                         | In-browser ML model execution                         |
+| **Runtime**      | [onnxruntime-web](https://github.com/microsoft/onnxruntime-web) 1.14                                                                                            | ONNX model runtime                                    |
+| **Database**     | [Dexie.js](https://dexie.org/) 4.4                                                                                                                              | IndexedDB wrapper (app data, vectors, images, memory) |
+| **Icons**        | [lucide-react](https://lucide.dev/)                                                                                                                             | Consistent SVG icon set                               |
+| **Markdown**     | [react-markdown](https://github.com/remarkjs/react-markdown) + [react-syntax-highlighter](https://github.com/react-syntax-highlighter/react-syntax-highlighter) | Message rendering                                     |
+| **PDF**          | [pdfjs-dist](https://mozilla.github.io/pdf.js/) 5.7                                                                                                             | PDF text extraction and rendering                     |
+| **PWA**          | [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) 1.3                                                                                                        | Service worker, manifest                              |
+| **Testing**      | [Vitest](https://vitest.dev/) 4.1 + [Testing Library](https://testing-library.com/)                                                                             | Unit and integration tests                            |
+| **E2E Testing**  | [Playwright](https://playwright.dev/)                                                                                                                           | End-to-end and accessibility tests                    |
+| **Linting**      | [ESLint](https://eslint.org/) 10                                                                                                                                | Code quality (0 errors)                               |
+| **Formatting**   | [Prettier](https://prettier.io/) 3.9                                                                                                                            | Code formatting                                       |
+| **Pre-commit**   | [Husky](https://typicode.github.io/husky/) + [lint-staged](https://github.com/lint-staged/lint-staged)                                                          | Auto-lint on commit                                   |
 
 ---
 
@@ -162,7 +166,6 @@ When you first open the app, open the sidebar to see the model status panels. Yo
 2. **Language Model** (LaMini-Flan-T5-783M, ~1.5GB) — Required for chat
 3. **Whisper** (optional, ~150MB) — Required for audio transcription
 4. **Image Understanding** (optional, ~600MB) — Required for AI to describe images
-5. **Text-to-Speech** (optional, ~100MB) — For neural voice synthesis (feature was removed; browser SpeechSynthesis is used instead)
 
 > **Note:** Language models are large (700MB–1.5GB). First download may take several minutes.
 
@@ -186,17 +189,10 @@ Query → Embed query → Search similar vectors → BM25 re-rank → Context �
 
 You can also **drag and drop** images directly onto the chat area.
 
-### Code Execution
-
-The AI can write and execute JavaScript code in a sandboxed Web Worker:
-- No network access (fetch/XHR blocked)
-- No DOM access
-- 5-second timeout
-- Console output is streamed back in real-time
-
 ### Persistent Memory
 
 The AI remembers facts you tell it across conversations:
+
 - "My name is John" → remembers your name
 - "I love Python" → remembers your preferences
 - Next conversation: "What do I like?" → "You love Python!"
@@ -223,16 +219,16 @@ Requires **Whisper** model.
 
 ### Conversation Management
 
-| Action | How |
-|--------|-----|
-| **New Chat** | Click `+` or press `⌘N` |
-| **Pin** | Hover conversation → pin icon |
-| **Rename** | Hover → pencil icon |
-| **Archive** | Hover → archive icon |
-| **Delete** | Hover → trash icon |
-| **Export JSON** | Hover → download icon |
-| **Search Messages** | `⌘F` or search icon in top bar |
-| **Share** | Share icon → copy or download as Markdown |
+| Action              | How                                       |
+| ------------------- | ----------------------------------------- |
+| **New Chat**        | Click `+` or press `⌘N`                   |
+| **Pin**             | Hover conversation → pin icon             |
+| **Rename**          | Hover → pencil icon                       |
+| **Archive**         | Hover → archive icon                      |
+| **Delete**          | Hover → trash icon                        |
+| **Export JSON**     | Hover → download icon                     |
+| **Search Messages** | `⌘F` or search icon in top bar            |
+| **Share**           | Share icon → copy or download as Markdown |
 
 ---
 
@@ -392,14 +388,14 @@ No required environment variables. All configuration is through the Settings UI 
 
 ### Key Constants (`src/lib/constants.js`)
 
-| Constant | Default | Description |
-|----------|---------|-------------|
-| `INFERENCE_MAX_TOKENS` | 512 | Max tokens for browser inference |
-| `INFERENCE_TEMPERATURE` | 0.3 | Temperature for browser inference |
-| `INFERENCE_SERVER_MAX_TOKENS` | 2048 | Max tokens for server inference |
-| `CHUNK_SIZE` | 500 | Document chunk size (characters) |
-| `RAG_TOP_K` | 3 | Top-K results for RAG |
-| `SCROLL_THRESHOLD_PX` | 80 | Auto-scroll threshold |
+| Constant                      | Default | Description                       |
+| ----------------------------- | ------- | --------------------------------- |
+| `INFERENCE_MAX_TOKENS`        | 512     | Max tokens for browser inference  |
+| `INFERENCE_TEMPERATURE`       | 0.3     | Temperature for browser inference |
+| `INFERENCE_SERVER_MAX_TOKENS` | 2048    | Max tokens for server inference   |
+| `CHUNK_SIZE`                  | 500     | Document chunk size (characters)  |
+| `RAG_TOP_K`                   | 3       | Top-K results for RAG             |
+| `SCROLL_THRESHOLD_PX`         | 80      | Auto-scroll threshold             |
 
 ---
 
@@ -407,18 +403,19 @@ No required environment variables. All configuration is through the Settings UI 
 
 ### Scripts
 
-| Script | Command | Description |
-|--------|---------|-------------|
-| `dev` | `npm run dev` | Start dev server with HMR |
-| `build` | `npm run build` | Production build |
-| `test` | `npm test` | Run all 88 tests |
-| `lint` | `npm run lint` | ESLint check |
-| `format` | `npm run format` | Prettier format all files |
-| `prepare` | `npm run prepare` | Initialize Husky hooks |
+| Script    | Command           | Description               |
+| --------- | ----------------- | ------------------------- |
+| `dev`     | `npm run dev`     | Start dev server with HMR |
+| `build`   | `npm run build`   | Production build          |
+| `test`    | `npm test`        | Run all 88 tests          |
+| `lint`    | `npm run lint`    | ESLint check              |
+| `format`  | `npm run format`  | Prettier format all files |
+| `prepare` | `npm run prepare` | Initialize Husky hooks    |
 
 ### Pre-commit Hook
 
 Every `git commit` automatically runs:
+
 1. `eslint --fix` on `.js`/`.jsx` files
 2. `prettier --write` for formatting
 
@@ -445,6 +442,7 @@ npm run build  # Output in dist/
 ```
 
 The production build includes:
+
 - Minified JS with tree-shaking
 - CSS extraction and minification
 - Service worker with asset caching (versioned)
@@ -458,6 +456,7 @@ The production build includes:
 ### Does this app send my data anywhere?
 
 **No.** All AI inference runs locally. External requests are only:
+
 - Model downloads (from Hugging Face CDN)
 - Web search (if enabled, DuckDuckGo API)
 - Local Ollama server (if enabled, to your machine)
@@ -493,7 +492,7 @@ Yes — **Settings → Clear All Data**. This deletes all IndexedDB databases, c
 
 ---
 
-*Built with ❤️ by [Medgabsi99](https://github.com/Medgabsi99)*
+_Built with ❤️ by [Medgabsi99](https://github.com/Medgabsi99)_
 
 ---
 

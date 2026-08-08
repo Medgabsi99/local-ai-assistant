@@ -25,7 +25,12 @@ export async function searchWeb(query) {
 
     const res = await fetch(
       `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1&pretty=1`,
-      { signal: AbortSignal.any([abortController.signal, AbortSignal.timeout(5000)]) },
+      {
+        signal: AbortSignal.any([abortController.signal, AbortSignal.timeout(5000)]),
+        credentials: 'omit',
+        cache: 'no-store',
+        referrerPolicy: 'no-referrer',
+      },
     );
 
     if (!res.ok) return null;
