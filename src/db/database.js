@@ -1,6 +1,7 @@
 import Dexie from 'dexie';
 import { getVectorStore } from '../lib/vector-store-access';
 import { sanitizeText, sanitizeTitle } from '../lib/security';
+import { normalizeBackupPayload } from './backup';
 
 class LocalAIDatabase extends Dexie {
   constructor() {
@@ -78,11 +79,7 @@ export async function exportAppData() {
 }
 
 export async function importAppData(payload) {
-  const documents = Array.isArray(payload?.documents) ? payload.documents : [];
-  const documentChunks = Array.isArray(payload?.documentChunks) ? payload.documentChunks : [];
-  const conversations = Array.isArray(payload?.conversations) ? payload.conversations : [];
-  const messages = Array.isArray(payload?.messages) ? payload.messages : [];
-  const settings = Array.isArray(payload?.settings) ? payload.settings : [];
+  const { documents, documentChunks, conversations, messages, settings } = normalizeBackupPayload(payload);
 
   await db.transaction('rw', db.documents, db.documentChunks, db.conversations, db.messages, db.settings, async () => {
     await Promise.all([
